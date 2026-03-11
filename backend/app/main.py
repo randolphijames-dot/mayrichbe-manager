@@ -99,5 +99,9 @@ def health_check():
 app.include_router(api_router)
 
 # 静态文件服务（前端构建产物，挂载在最后，防止拦截 API 路由）
-if os.path.exists("./static"):
-    app.mount("/", StaticFiles(directory="./static", html=True), name="static")
+static_dir = os.environ.get('STATIC_DIR', './static')
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+else:
+    import logging
+    logging.warning(f"[Main] 静态文件目录不存在: {static_dir}")
