@@ -18,6 +18,8 @@ dist-electron/
 *.spec
 backend/static/
 electron/backend-dist/
+backend/backend_mac
+backend/backend_win.exe
 backend/build/
 
 # IDE / OS
