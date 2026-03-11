@@ -2,14 +2,39 @@
 
 支持 30+ 账号的批量定时发布、素材管理、账号健康检测。
 
-## 快速启动（开发模式）
+## 🚀 快速启动（推荐）
+
+### Windows 用户
+1. **双击 `START_WINDOWS.bat`**
+2. 等待自动打开浏览器
+3. 开始使用！
+
+### Mac 用户
+1. **双击 `START_MAC.command`**
+2. 等待自动打开浏览器
+3. 开始使用！
+
+**首次启动**：
+- 会自动安装 Python 依赖（约 2-3 分钟）
+- 以后启动只需 5 秒
+
+**访问地址**：http://localhost:8000
+
+---
+
+## 📋 前提条件
+
+- ✅ **Python 3.11+**（[下载地址](https://www.python.org/downloads/)）
+- ✅ **AdsPower**（用于 Instagram 发布，[下载地址](https://www.adspower.net/)）
+
+---
+
+## 🛠️ 开发模式启动
 
 ```bash
-# 前提：安装并运行 AdsPower（用于 Instagram 指纹浏览器发布）
+# 前提：安装并运行 AdsPower
 ./start.sh
 ```
-
-访问 http://localhost:5173
 
 ## Docker 启动
 
