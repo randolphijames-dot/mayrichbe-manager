@@ -82,12 +82,12 @@ function getPythonExecutable() {
   const resourcesPath = process.resourcesPath || __dirname
 
   // 打包后：使用内置 Python（PyInstaller 生成的可执行文件）
-  const bundledNames = {
+  const bundledPaths = {
     darwin: 'backend_mac',
-    win32: 'backend_win.exe',
+    win32: 'backend_win/backend_win.exe',  // --onedir 模式，在子目录中
     linux: 'backend_linux',
   }
-  const bundledExe = path.join(resourcesPath, 'backend', bundledNames[process.platform] || 'backend')
+  const bundledExe = path.join(resourcesPath, 'backend', bundledPaths[process.platform] || 'backend')
   if (fs.existsSync(bundledExe)) {
     console.log('[Main] 使用内置 Python 后端:', bundledExe)
     return { exe: bundledExe, args: [], useBundled: true }

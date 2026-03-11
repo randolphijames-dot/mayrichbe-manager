@@ -29,7 +29,7 @@
         "to": "backend",
         "filter": [
           "backend_mac",
-          "backend_win.exe",
+          "backend_win/**",
           "static/**",
           "!__pycache__/**",
           "!**/*.pyc",

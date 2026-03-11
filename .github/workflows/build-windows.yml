@@ -39,7 +39,7 @@ jobs:
       - name: Build Python Backend (PyInstaller)
         run: |
           cd backend
-          pyinstaller --onefile --name backend_win `
+          pyinstaller --onedir --name backend_win `
             --collect-all "app" `
             --collect-all "instagrapi" `
             --hidden-import "apscheduler.triggers.date" `
@@ -49,9 +49,10 @@ jobs:
             --distpath ../electron/backend-dist `
             run_server.py
 
-      - name: Copy backend_win.exe to backend
+      - name: Copy backend_win folder to backend
         run: |
-          Copy-Item electron/backend-dist/backend_win.exe backend/
+          if (Test-Path backend/backend_win) { Remove-Item -Recurse -Force backend/backend_win }
+          Copy-Item -Recurse electron/backend-dist/backend_win backend/
 
       - name: Install Electron dependencies
         run: cd electron && npm ci
