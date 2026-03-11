@@ -6,13 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.account import Account, Platform
+from app.models.oauth_state import OAuthState
 from app.services.youtube_publisher import build_oauth_flow, YouTubePublisher
 from app.core.config import settings
 
 router = APIRouter(prefix="/youtube", tags=["YouTube OAuth"])
-
-# 临时存储 state → account_id 的映射（生产环境应改用 Redis）
-_pending_oauth: dict = {}
 
 
 @router.get("/oauth/start/{account_id}")
@@ -31,8 +29,10 @@ def start_oauth(account_id: int, db: Session = Depends(get_db)):
         include_granted_scopes="true",
         prompt="consent",
     )
-    # 保存 state 与 account_id 的关联
-    _pending_oauth[state] = account_id
+    # 保存 state 与 account_id 的关联（数据库存储，10分钟过期）
+    OAuthState.create_state(db, state, account_id, ttl_minutes=10)
+    # 清理过期的 state
+    OAuthState.cleanup_expired(db)
     return {"auth_url": auth_url, "state": state}
 
 
@@ -43,9 +43,9 @@ def oauth_callback(
     db: Session = Depends(get_db),
 ):
     """OAuth 回调：接收 code，换取 Token，保存到账号"""
-    account_id = _pending_oauth.pop(state, None)
+    account_id = OAuthState.get_account_id(db, state)
     if account_id is None:
-        raise HTTPException(status_code=400, detail="无效的 OAuth state，请重新授权")
+        raise HTTPException(status_code=400, detail="无效或过期的 OAuth state，请重新授权")
 
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:

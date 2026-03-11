@@ -94,13 +94,13 @@ def _run_publish_task(task_id: int):
     """实际执行发布逻辑（在线程池中运行）"""
     import traceback
     from app.db.session import SessionLocal
-    from app.models.task import ScheduledTask
+    from app.models.task import PublishTask
     from app.models.account import Account
     from app.models.material import Material
 
     db = SessionLocal()
     try:
-        task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
+        task = db.query(PublishTask).filter(PublishTask.id == task_id).first()
         if not task or task.status not in ("pending", "scheduled"):
             return
 
@@ -147,7 +147,7 @@ def _publish_instagram(task, account, material, db):
         if account.browser_type == BrowserType.NONE or not account.browser_type:
             # instagrapi 方式（模拟安卓 App）
             from app.services.instagrapi_publisher import publish_video, publish_image
-            publisher_fn = publish_video if material.file_type == "video" else publish_image
+            publisher_fn = publish_video if material.material_type == "video" else publish_image
         else:
             # 指纹浏览器方式（备用）
             from app.services.instagram_publisher import InstagramPublisher
@@ -159,19 +159,15 @@ def _publish_instagram(task, account, material, db):
             db.commit()
             return
 
-        # instagrapi 路径
-        from app.core.encryption import safe_decrypt
-        password = safe_decrypt(account.ins_password_encrypted)
-        totp_secret = safe_decrypt(account.ins_totp_secret_encrypted) if account.ins_totp_secret_encrypted else None
-
+        # instagrapi 路径（传入加密的密码，函数内部会解密）
         result = publisher_fn(
             account_id=account.id,
             username=account.username,
-            password=password,
-            media_path=material.file_path,
+            password_encrypted=account.ins_password_encrypted,
+            file_path=material.file_path,
             caption=task.caption or material.default_caption or "",
             proxy=account.proxy,
-            totp_secret=totp_secret,
+            totp_secret_encrypted=account.ins_totp_secret_encrypted,
         )
         task.status = "success" if result.get("success") else "failed"
         task.result_message = result.get("message", "")[:500]

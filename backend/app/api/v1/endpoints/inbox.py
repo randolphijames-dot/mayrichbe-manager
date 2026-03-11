@@ -14,6 +14,26 @@ router = APIRouter(prefix="/inbox", tags=["消息中心"])
 _cache: dict = {}
 _cache_ts: dict = {}
 CACHE_TTL = 60  # 秒
+MAX_CACHE_SIZE = 100  # 最大缓存条数，防止内存溢出
+
+
+def _cleanup_cache():
+    """清理过期缓存和超出限制的缓存"""
+    import time as _time
+    # 清理过期
+    now = _time.time()
+    expired_keys = [k for k, ts in _cache_ts.items() if now - ts > CACHE_TTL]
+    for k in expired_keys:
+        _cache.pop(k, None)
+        _cache_ts.pop(k, None)
+
+    # 如果还是超出限制，删除最旧的
+    if len(_cache) > MAX_CACHE_SIZE:
+        sorted_keys = sorted(_cache_ts.items(), key=lambda x: x[1])
+        to_remove = len(_cache) - MAX_CACHE_SIZE
+        for k, _ in sorted_keys[:to_remove]:
+            _cache.pop(k, None)
+            _cache_ts.pop(k, None)
 
 
 # ─── 请求/响应模型 ───────────────────────────────
@@ -38,6 +58,9 @@ def get_all_comments(
 
     accounts = _get_target_accounts(account_id, db)
     all_comments = []
+
+    # 清理过期缓存
+    _cleanup_cache()
 
     for acc in accounts:
         if not acc.ins_password_encrypted:
@@ -80,6 +103,9 @@ def get_all_dm(
 
     accounts = _get_target_accounts(account_id, db)
     all_dm = []
+
+    # 清理过期缓存
+    _cleanup_cache()
 
     for acc in accounts:
         if not acc.ins_password_encrypted:

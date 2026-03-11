@@ -5,8 +5,7 @@
 ## 快速启动（开发模式）
 
 ```bash
-# 前提：安装 Redis（brew install redis && brew services start redis）
-# 前提：安装并运行 AdsPower（用于 Instagram 指纹浏览器）
+# 前提：安装并运行 AdsPower（用于 Instagram 指纹浏览器发布）
 ./start.sh
 ```
 
