@@ -12,6 +12,26 @@ const BACKEND_PORT = 8000
 let mainWindow = null
 let splashWindow = null
 let backendProcess = null
+const net = require('net')
+
+// ─── 检测端口是否被占用 ─────────────────────────────
+function checkPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(true)  // 端口被占用
+      } else {
+        resolve(false)
+      }
+    })
+    server.once('listening', () => {
+      server.close()
+      resolve(false)  // 端口可用
+    })
+    server.listen(port)
+  })
+}
 
 // ─── 启动画面 ─────────────────────────────────────────
 function createSplash() {
@@ -136,8 +156,8 @@ function startBackend() {
 }
 
 // ─── 等待后端就绪 ─────────────────────────────────────
-// 首次启动 PyInstaller 解压约 10-20 秒，超时设为 90 秒
-function waitForBackend(attempts = 0, maxAttempts = 180) {
+// 首次启动 PyInstaller 解压约 10-20 秒，慢电脑可能更久，超时设为 162 秒
+function waitForBackend(attempts = 0, maxAttempts = 300) {
   return new Promise((resolve, reject) => {
     const check = () => {
       http.get(`http://localhost:${BACKEND_PORT}/health`, (res) => {
@@ -158,6 +178,25 @@ function waitForBackend(attempts = 0, maxAttempts = 180) {
 // ─── 应用生命周期 ─────────────────────────────────────
 app.whenReady().then(async () => {
   createSplash()
+
+  // 先检查端口是否被占用
+  const portInUse = await checkPortInUse(BACKEND_PORT)
+  if (portInUse) {
+    const logPath = path.join(app.getPath('userData'), 'backend.log')
+    dialog.showErrorBox(
+      '启动失败 - 端口被占用',
+      `端口 ${BACKEND_PORT} 已被其他程序占用\n\n` +
+      `请关闭占用该端口的程序后重试。\n\n` +
+      `查看占用端口的程序（Windows）：\n` +
+      `1. 按 Win+R 打开运行窗口\n` +
+      `2. 输入 cmd 回车\n` +
+      `3. 输入命令：netstat -ano | findstr ${BACKEND_PORT}\n\n` +
+      `日志位置：${logPath}`
+    )
+    app.quit()
+    return
+  }
+
   startBackend()
 
   try {
@@ -165,7 +204,18 @@ app.whenReady().then(async () => {
     createMainWindow()
   } catch (err) {
     const logPath = path.join(app.getPath('userData'), 'backend.log')
-    dialog.showErrorBox('启动失败', `后端服务启动失败：${err.message}\n\n可能原因：1) 端口 8000 被占用  2) 首次启动较慢（请再试一次）\n\n日志：${logPath}`)
+    dialog.showErrorBox(
+      '启动失败 - 后端超时',
+      `后端服务启动超时：${err.message}\n\n` +
+      `可能原因：\n` +
+      `1) 首次启动需要解压文件，较慢（请再试一次）\n` +
+      `2) 杀毒软件正在扫描（请稍候或添加信任）\n` +
+      `3) 磁盘性能较低（机械硬盘或 USB 外接盘）\n\n` +
+      `建议：\n` +
+      `- 将本程序添加到杀毒软件白名单\n` +
+      `- 等待 1-2 分钟后再试一次\n\n` +
+      `日志位置：${logPath}`
+    )
     app.quit()
   }
 })
