@@ -1,5 +1,6 @@
 """FastAPI 应用入口"""
 import os
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,29 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.api.v1.router import api_router
+
+
+def find_static_dir():
+    """智能查找 static 目录（兼容开发/打包/Electron 环境）"""
+    # 候选路径（按优先级）
+    candidates = [
+        os.environ.get('STATIC_DIR'),  # 环境变量指定
+        './static',  # 当前目录
+        '../static',  # 上一级
+        os.path.join(os.getcwd(), 'static'),  # 工作目录
+        os.path.join(os.path.dirname(__file__), '..', '..', 'static'),  # 相对 app 目录
+    ]
+
+    # PyInstaller 打包后的特殊处理
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(os.path.dirname(sys.executable))  # 回到 backend/
+        candidates.insert(0, os.path.join(base, 'static'))
+
+    for path in candidates:
+        if path and os.path.exists(path) and os.path.isdir(path):
+            return os.path.abspath(path)
+
+    return None
 
 
 @asynccontextmanager
@@ -99,9 +123,11 @@ def health_check():
 app.include_router(api_router)
 
 # 静态文件服务（前端构建产物，挂载在最后，防止拦截 API 路由）
-static_dir = os.environ.get('STATIC_DIR', './static')
-if os.path.exists(static_dir):
+static_dir = find_static_dir()
+if static_dir:
+    import logging
+    logging.getLogger(__name__).info(f"[Main] 静态文件目录: {static_dir}")
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 else:
     import logging
-    logging.warning(f"[Main] 静态文件目录不存在: {static_dir}")
+    logging.warning(f"[Main] ⚠️ 未找到静态文件目录，前端页面将无法访问")
