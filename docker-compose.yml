@@ -1,0 +1,107 @@
+version: "3.9"
+
+# 注意：AdsPower 需要在本地 Mac 单独安装运行（不在 Docker 内）
+# AdsPower 默认监听 http://local.adspower.net:50325
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/social_manager.db:/app/social_manager.db
+    environment:
+      - DATABASE_URL=sqlite:///./social_manager.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      # AdsPower 运行在宿主机，使用 host.docker.internal 访问
+      - ADSPOWER_API_URL=http://host.docker.internal:50325
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  celery-worker-default:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    command: celery -A app.tasks.celery_app worker -Q default,youtube,health -l info -c 4
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/social_manager.db:/app/social_manager.db
+    environment:
+      - DATABASE_URL=sqlite:///./social_manager.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ADSPOWER_API_URL=http://host.docker.internal:50325
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  celery-worker-instagram:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    # Instagram 任务需要 AdsPower，只开 1 个并发防止冲突
+    command: celery -A app.tasks.celery_app worker -Q instagram -l info -c 1
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/social_manager.db:/app/social_manager.db
+    environment:
+      - DATABASE_URL=sqlite:///./social_manager.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ADSPOWER_API_URL=http://host.docker.internal:50325
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    command: celery -A app.tasks.celery_app beat -l info
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/social_manager.db:/app/social_manager.db
+    environment:
+      - DATABASE_URL=sqlite:///./social_manager.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis_data:

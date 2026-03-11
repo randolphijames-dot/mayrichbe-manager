@@ -1,0 +1,5 @@
+name,username,platform,group_name,proxy,browser_type,browser_profile_id,notes
+日本財経_INS_01,finance_jp_01,instagram,财经类,http://user:pass@1.2.3.4:8080,adspower,abc123profile,主账号
+日本財経_INS_02,finance_jp_02,instagram,财经类,http://user:pass@1.2.3.5:8080,bitbrowser,bitprofile456,副账号
+生活系_INS_01,life_jp_01,instagram,生活类,http://user:pass@1.2.3.6:8080,adspower,,生活号
+日本財経_YT_01,finance_yt_main,youtube,财经类,,,, YouTube主频道

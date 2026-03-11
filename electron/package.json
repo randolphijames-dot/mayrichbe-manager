@@ -1,0 +1,84 @@
+{
+  "name": "mayrichbe-manager",
+  "version": "1.1.0",
+  "description": "Mayrichbe Manager - INS/YouTube 矩阵管理系统",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build:mac": "electron-builder --mac --x64 --arm64",
+    "build:win": "electron-builder --win --x64",
+    "build:all": "electron-builder --mac --win --x64"
+  },
+  "build": {
+    "appId": "com.mayrichbe.manager",
+    "productName": "Mayrichbe Manager",
+    "directories": { "output": "../dist-electron" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html",
+      "assets/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "backend_mac",
+          "backend_win.exe",
+          "static/**",
+          "!__pycache__/**",
+          "!**/*.pyc",
+          "!.venv/**",
+          "!uploads/**",
+          "!*.db",
+          "!build/**",
+          "!dist/**",
+          "!*.spec",
+          "!run_server.py",
+          "!requirements.txt",
+          "!.env*"
+        ]
+      }
+    ],
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["zh_CN", "ja", "en_US"],
+      "language": "2052",
+      "createDesktopShortcut": true,
+      "shortcutName": "Mayrichbe Manager"
+    },
+    "dmg": {
+      "title": "Mayrichbe Manager",
+      "contents": [
+        { "x": 150, "y": 180 },
+        { "x": 400, "y": 180, "type": "link", "path": "/Applications" }
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.0",
+    "find-free-port": "^2.0.0"
+  }
+}

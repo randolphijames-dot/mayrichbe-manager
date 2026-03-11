@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+/* ─── 深色主题（默认）─── */
+:root {
+  --bg-base:        #0f172a;
+  --bg-surface:     #1e293b;
+  --bg-surface2:    #0a1628;
+  --bg-hover:       #1e293b;
+  --border:         #334155;
+  --border-light:   #1e293b;
+  --text-primary:   #f1f5f9;
+  --text-muted:     #94a3b8;
+  --text-faint:     #64748b;
+  --text-code:      #94a3b8;
+  --brand:          #0ea5e9;
+  --brand-hover:    #0284c7;
+  --modal-overlay:  rgba(0, 0, 0, 0.7);
+  --input-bg:       #0f172a;
+}
+
+/* ─── 亮色主题 ─── */
+.theme-light {
+  --bg-base:        #f8fafc;
+  --bg-surface:     #ffffff;
+  --bg-surface2:    #f1f5f9;
+  --bg-hover:       #f0f4f8;
+  --border:         #e2e8f0;
+  --border-light:   #f1f5f9;
+  --text-primary:   #0f172a;
+  --text-muted:     #334155;
+  --text-faint:     #64748b;
+  --text-code:      #475569;
+  --brand:          #0284c7;
+  --brand-hover:    #0369a1;
+  --modal-overlay:  rgba(15, 23, 42, 0.4);
+  --input-bg:       #f8fafc;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+/* 卡片基础样式 */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* 输入框基础样式 */
+.input {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: var(--brand); }
+.input::placeholder { color: var(--text-faint); }
+select.input option { background: var(--bg-surface); color: var(--text-primary); }
+
+/* 按钮基础样式 */
+.btn { 
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s; border: none; outline: none;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--brand); color: white; }
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-secondary { background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-hover); }
+.btn-danger { background: #dc2626; color: white; }
+.btn-danger:hover { background: #b91c1c; }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg-surface); color: var(--text-primary); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 标签 */
+.badge { 
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+}
+.badge-green { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+.badge-red { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
+.badge-yellow { background: #422006; color: #fbbf24; border: 1px solid #92400e; }
+.badge-blue { background: #0c1a2e; color: #60a5fa; border: 1px solid #1d4ed8; }
+.badge-gray { background: var(--bg-surface); color: var(--text-muted); border: 1px solid var(--border); }
+.badge-pink { background: #2d0a1e; color: #f472b6; border: 1px solid #9d174d; }
+.badge-purple { background: #2e1065; color: #c084fc; border: 1px solid #7e22ce; }
+
+/* 亮色主题下的标签调整 */
+.theme-light .badge-green { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.theme-light .badge-red { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.theme-light .badge-yellow { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.theme-light .badge-blue { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.theme-light .badge-pink { background: #fce7f3; color: #9d174d; border-color: #fbcfe8; }
+.theme-light .badge-purple { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
+
+/* 表格 */
+.table { width: 100%; border-collapse: collapse; }
+.table th { 
+  text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 600;
+  color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.table td { 
+  padding: 12px 16px; border-bottom: 1px solid var(--border-light); 
+  font-size: 14px; color: var(--text-muted); 
+}
+.table tr:hover td { background: var(--bg-hover); }
+.table tr:last-child td { border-bottom: none; }
+
+/* 侧边栏导航项 */
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 8px;
+  color: var(--text-muted); font-size: 14px; cursor: pointer;
+  transition: all 0.15s; text-decoration: none;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active { background: var(--bg-base); color: var(--brand); }
+
+/* 统计卡片 KPI */
+.stat-card {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; display: flex; flex-direction: column; gap: 8px;
+}
+.stat-value { font-size: 32px; font-weight: 700; color: var(--text-primary); line-height: 1; }
+.stat-label { font-size: 12px; color: var(--text-faint); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* 空状态 */
+.empty-state { 
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 20px; gap: 12px; color: var(--text-faint); text-align: center;
+}
+.empty-state svg { opacity: 0.3; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   亮色主题：强制覆盖所有硬编码深色
+   用 !important 解决 inline style 优先级问题
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* 覆盖 modal 遮罩和弹窗背景 */
+.theme-light .fixed.inset-0.z-50,
+.theme-light [class*="fixed"][class*="inset-0"] {
+  background: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 白字变深色 */
+.theme-light [style*="color:#f1f5f9"],
+.theme-light [style*="color: #f1f5f9"],
+.theme-light [style*="color:#e2e8f0"],
+.theme-light [style*="color:#cbd5e1"] {
+  color: var(--text-primary) !important;
+}
+
+/* 次要灰字适配 */
+.theme-light [style*="color:#94a3b8"],
+.theme-light [style*="color: #94a3b8"] {
+  color: var(--text-muted) !important;
+}
+.theme-light [style*="color:#64748b"],
+.theme-light [style*="color: #64748b"] {
+  color: var(--text-faint) !important;
+}
+
+/* 深色背景转浅色 */
+.theme-light [style*="background:#1e293b"],
+.theme-light [style*="background: #1e293b"] {
+  background: var(--bg-surface) !important;
+}
+.theme-light [style*="background:#0f172a"],
+.theme-light [style*="background: #0f172a"] {
+  background: var(--bg-base) !important;
+}
+.theme-light [style*="background:#0a1628"],
+.theme-light [style*="background: #0a1628"] {
+  background: var(--bg-surface2) !important;
+}
+.theme-light [style*="background:#334155"],
+.theme-light [style*="background: #334155"] {
+  background: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Modal 卡片本体（最常见的弹窗容器） */
+.theme-light .fixed .card,
+.theme-light .fixed [class*="rounded"] {
+  background: var(--bg-surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* 代码块 / pre 颜色 */
+.theme-light code[style*="color:#4ade80"] { color: #166534 !important; }
+.theme-light [style*="background:#052e16"] { background: #dcfce7 !important; border-color: #bbf7d0 !important; }
+.theme-light [style*="background:#450a0a"] { background: #fee2e2 !important; border-color: #fecaca !important; }
+.theme-light [style*="background:#0c1a2e"] { background: #eff6ff !important; border-color: #bfdbfe !important; }
+.theme-light [style*="background:#422006"] { background: #fef3c7 !important; border-color: #fde68a !important; }
+
+/* 表格覆盖 */
+.theme-light .table td { color: var(--text-muted) !important; border-color: var(--border-light) !important; }
+.theme-light .table th { color: var(--text-faint) !important; border-color: var(--border) !important; }
+.theme-light .table tr:hover td { background: var(--bg-hover) !important; }
+
+/* 渐变卡片（仪表盘用） */
+.theme-light [style*="background: linear-gradient(135deg, #0c1a2e"] {
+  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%) !important;
+  border-color: #bfdbfe !important;
+}
+
+/* input select option 深色 */
+.theme-light select option { background: var(--bg-surface) !important; color: var(--text-primary) !important; }

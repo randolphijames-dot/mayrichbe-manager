@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+.env
+.env.local
+uploads/
+
+# Node
+node_modules/
+
+# Build
+dist/
+Mayrichbe_Manager_Windows.zip
+dist-electron/
+*.spec
+backend/static/
+electron/backend-dist/
+backend/build/
+
+# IDE / OS
+.DS_Store
+*.log
+.idea/
+.vscode/

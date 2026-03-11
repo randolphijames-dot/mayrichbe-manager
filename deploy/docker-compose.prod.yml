@@ -1,0 +1,120 @@
+version: "3.9"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Social Manager - 生产环境 Docker Compose
+#  适用：专用 Windows/Mac 迷你 PC + Cloudflare Tunnel
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+services:
+  # Redis
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks: [app]
+
+  # 后端 API
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    restart: always
+    environment:
+      - DATABASE_URL=sqlite:////data/social_manager.db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ADSPOWER_API_URL=${ADSPOWER_API_URL:-http://host.docker.internal:50325}
+      - BITBROWSER_API_URL=${BITBROWSER_API_URL:-http://host.docker.internal:54345}
+      - SECRET_KEY=${SECRET_KEY:-change_this_to_random_string_in_production}
+      - ACCESS_PASSWORD=${ACCESS_PASSWORD:-}
+      - LINE_NOTIFY_TOKEN=${LINE_NOTIFY_TOKEN:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - YT_CLIENT_ID=${YT_CLIENT_ID:-}
+      - YT_CLIENT_SECRET=${YT_CLIENT_SECRET:-}
+    volumes:
+      - uploads:/app/uploads
+      - db_data:/data
+    depends_on: [redis]
+    networks: [app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # 访问宿主机的 AdsPower
+
+  # Celery Worker（Instagram，单并发防封号）
+  celery-instagram:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    restart: always
+    command: celery -A app.tasks.celery_app worker -Q instagram -l warning -c 1 --pool=prefork
+    environment:
+      - DATABASE_URL=sqlite:////data/social_manager.db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ADSPOWER_API_URL=${ADSPOWER_API_URL:-http://host.docker.internal:50325}
+      - BITBROWSER_API_URL=${BITBROWSER_API_URL:-http://host.docker.internal:54345}
+      - SECRET_KEY=${SECRET_KEY:-change_this_in_prod}
+    volumes:
+      - uploads:/app/uploads
+      - db_data:/data
+    depends_on: [redis]
+    networks: [app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Celery Worker（YouTube + 默认队列）
+  celery-default:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    restart: always
+    command: celery -A app.tasks.celery_app worker -Q default,youtube,health -l warning -c 2
+    environment:
+      - DATABASE_URL=sqlite:////data/social_manager.db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change_this_in_prod}
+    volumes:
+      - uploads:/app/uploads
+      - db_data:/data
+    depends_on: [redis]
+    networks: [app]
+
+  # Celery Beat（定时调度）
+  celery-beat:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    restart: always
+    command: celery -A app.tasks.celery_app beat -l warning
+    environment:
+      - DATABASE_URL=sqlite:////data/social_manager.db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - db_data:/data
+    depends_on: [redis]
+    networks: [app]
+
+  # Nginx（反向代理 + 前端静态文件 + 访问密码）
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./htpasswd:/etc/nginx/.htpasswd:ro
+      - ../backend/static:/usr/share/nginx/html:ro
+    depends_on: [backend]
+    networks: [app]
+
+volumes:
+  redis_data:
+  uploads:
+  db_data:
+
+networks:
+  app:
+    driver: bridge

@@ -1,0 +1,4 @@
+name,username,platform,proxy,adspower_profile_id,notes
+日本財経_INS_01,finance_jp_01,instagram,http://user:pass@1.2.3.4:8080,adspower_profile_id_here,INS主号
+日本財経_INS_02,finance_jp_02,instagram,http://user:pass@1.2.3.5:8080,,INS副号
+日本財経_YT_01,finance_jp_yt_01,youtube,,,YouTube主频道
