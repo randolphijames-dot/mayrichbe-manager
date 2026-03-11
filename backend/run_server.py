@@ -3,6 +3,9 @@ import os
 import sys
 import uvicorn
 
+# 直接导入 app，而不是用字符串（PyInstaller 打包后字符串形式会失败）
+from app.main import app as application
+
 
 def get_base_path():
     """获取基础路径（兼容 PyInstaller 打包后的路径）"""
@@ -17,8 +20,9 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 8000))
 
+    # 直接传入 app 对象，不用字符串
     uvicorn.run(
-        "app.main:app",
+        application,
         host="127.0.0.1",
         port=port,
         log_level="info",
