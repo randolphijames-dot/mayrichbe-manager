@@ -30,8 +30,6 @@ jobs:
           cd frontend
           npm ci
           npm run build
-          if (-not (Test-Path ../backend/static)) { New-Item -ItemType Directory -Path ../backend/static }
-          Copy-Item -Recurse -Force dist/* ../backend/static/
 
       - name: Install Python Dependencies
         run: |
