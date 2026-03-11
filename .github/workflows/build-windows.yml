@@ -40,20 +40,11 @@ jobs:
         run: |
           cd backend
           pyinstaller --onefile --name backend_win `
-            --hidden-import "app.api.v1.endpoints.accounts" `
-            --hidden-import "app.api.v1.endpoints.materials" `
-            --hidden-import "app.api.v1.endpoints.tasks" `
-            --hidden-import "app.api.v1.endpoints.logs" `
-            --hidden-import "app.api.v1.endpoints.youtube" `
-            --hidden-import "app.api.v1.endpoints.tools" `
-            --hidden-import "app.api.v1.endpoints.profile" `
-            --hidden-import "app.api.v1.endpoints.inbox" `
-            --hidden-import "app.api.v1.endpoints.traffic" `
+            --collect-all "app" `
+            --collect-all "instagrapi" `
             --hidden-import "apscheduler.triggers.date" `
             --hidden-import "apscheduler.jobstores.sqlalchemy" `
             --hidden-import "apscheduler.executors.pool" `
-            --hidden-import "instagrapi" `
-            --collect-all "instagrapi" `
             --noconfirm `
             --distpath ../electron/backend-dist `
             run_server.py
