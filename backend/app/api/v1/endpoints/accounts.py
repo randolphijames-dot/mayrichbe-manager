@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.account import Account, Platform, AccountStatus
 from app.schemas.account import AccountCreate, AccountUpdate, AccountOut, AccountImportRow
+from app.core.encryption import encrypt, safe_decrypt
 
 router = APIRouter(prefix="/accounts", tags=["账号管理"])
 
