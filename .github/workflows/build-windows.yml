@@ -74,6 +74,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $backendLog = Join-Path $env:APPDATA "mayrichbe-manager\backend.log"
 
           $portable = Get-ChildItem -Path . -Recurse -Filter "*.exe" |
             Where-Object {
@@ -92,9 +93,13 @@ jobs:
           $appProcess = Start-Process -FilePath $portable.FullName -PassThru
 
           try {
-            $deadline = (Get-Date).AddMinutes(3)
+            # CI 上首次启动可能较慢（便携版解压 + Defender 扫描）
+            $deadline = (Get-Date).AddMinutes(8)
             $healthy = $false
             while ((Get-Date) -lt $deadline) {
+              if ($appProcess -and $appProcess.HasExited) {
+                throw "App process exited early with code $($appProcess.ExitCode)"
+              }
               try {
                 $healthResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 3
                 if ($healthResp.status -eq "ok") {
@@ -108,7 +113,7 @@ jobs:
             }
 
             if (-not $healthy) {
-              throw "Health check failed: backend not ready within 3 minutes"
+              throw "Health check failed: backend not ready within 8 minutes"
             }
 
             $index = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -TimeoutSec 5 -UseBasicParsing
@@ -123,6 +128,12 @@ jobs:
             Write-Host "Smoke test passed"
           }
           finally {
+            if (Test-Path $backendLog) {
+              Write-Host "===== backend.log (tail 200) ====="
+              Get-Content $backendLog -Tail 200
+            } else {
+              Write-Host "backend.log not found at: $backendLog"
+            }
             if ($appProcess -and -not $appProcess.HasExited) {
               Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
             }
