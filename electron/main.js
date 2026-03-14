@@ -80,23 +80,41 @@ function createMainWindow() {
 // ─── Python 后端启动 ───────────────────────────────────
 function getPythonExecutable() {
   const resourcesPath = process.resourcesPath || __dirname
-
-  // 打包后：使用内置 Python（PyInstaller 生成的可执行文件）
-  const bundledPaths = {
+  const bundledNames = {
     darwin: 'backend_mac',
-    win32: 'backend_win/backend_win.exe',  // --onedir 模式，在子目录中
+    win32: 'backend_win.exe',
     linux: 'backend_linux',
   }
-  const bundledExe = path.join(resourcesPath, 'backend', bundledPaths[process.platform] || 'backend')
-  if (fs.existsSync(bundledExe)) {
-    console.log('[Main] 使用内置 Python 后端:', bundledExe)
-    return { exe: bundledExe, args: [], useBundled: true }
+  const bundledName = bundledNames[process.platform] || 'backend'
+
+  // 兼容安装版/便携版/不同 unpack 路径的多候选探测
+  const bundledCandidates = [
+    path.join(resourcesPath, 'backend', bundledName),
+    path.join(path.dirname(process.execPath), 'resources', 'backend', bundledName),
+    path.join(path.dirname(process.execPath), 'backend', bundledName),
+    path.join(__dirname, '..', 'backend', bundledName),
+  ]
+
+  for (const candidate of bundledCandidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      console.log('[Main] 使用内置 Python 后端:', candidate)
+      return { exe: candidate, args: [], useBundled: true }
+    }
   }
 
   // 开发模式：使用系统 Python + uvicorn
-  const venvPython = path.join(__dirname, '..', 'backend', '.venv', 'bin', 'python3')
+  const venvPython = process.platform === 'win32'
+    ? path.join(__dirname, '..', 'backend', '.venv', 'Scripts', 'python.exe')
+    : path.join(__dirname, '..', 'backend', '.venv', 'bin', 'python3')
   const sysPython = process.platform === 'win32' ? 'python' : 'python3'
   const pythonExe = fs.existsSync(venvPython) ? venvPython : sysPython
+
+  // 打包后不应回退到系统 Python（目标机器可能无 Python 依赖）
+  if (app.isPackaged) {
+    throw new Error(
+      `打包环境未找到内置后端可执行文件。候选路径: ${bundledCandidates.join(' | ')}`
+    )
+  }
 
   console.log('[Main] 开发模式，使用 Python:', pythonExe)
   return {
@@ -113,11 +131,19 @@ function startBackend() {
   const userData = app.getPath('userData')
   try { fs.mkdirSync(path.join(userData, 'uploads'), { recursive: true }) } catch (_) {}
 
+  const dbPath = path.join(userData, 'social_manager.db')
+  const uploadDir = path.join(userData, 'uploads')
+  // SQLite URL 使用正斜杠，避免 Windows 反斜杠转义
+  const databaseUrl = 'sqlite:///' + (process.platform === 'win32' ? dbPath.replace(/\\/g, '/') : dbPath)
+
   const env = {
     ...process.env,
     PORT: String(BACKEND_PORT),
-    DATABASE_URL: `sqlite:///${path.join(userData, 'social_manager.db')}`,
-    UPLOAD_DIR: path.join(userData, 'uploads'),
+    DATABASE_URL: databaseUrl,
+    UPLOAD_DIR: uploadDir,
+  }
+  if (process.platform === 'win32') {
+    env.PYTHONIOENCODING = 'utf-8'
   }
 
   const logPath = path.join(app.getPath('userData'), 'backend.log')
