@@ -16,6 +16,7 @@ dist/
 Mayrichbe_Manager_Windows.zip
 dist-electron/
 *.spec
+!backend/backend_win.spec
 backend/static/
 electron/backend-dist/
 backend/backend_mac
