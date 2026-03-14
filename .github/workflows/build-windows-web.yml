@@ -23,6 +23,13 @@ jobs:
           cd frontend
           npm ci
           npm run build
+          cd ..
+          dir backend\static
+          if not exist "backend\static\index.html" (
+            echo [ERROR] Frontend build output not found!
+            exit /b 1
+          )
+          echo [OK] Frontend build successful
 
       - name: Setup Python
         uses: actions/setup-python@v5
