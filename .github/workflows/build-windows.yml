@@ -66,22 +66,34 @@ jobs:
         run: |
           cd electron
           npm ci
-          npx electron-builder --win --x64 --publish never
+          npm run build:win -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate Windows package outputs
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Recurse -Filter "*.exe" |
+            Where-Object { $_.FullName -notmatch '\\node_modules\\' } |
+            Sort-Object FullName |
+            ForEach-Object { Write-Host $_.FullName }
 
       - name: Smoke test portable EXE
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $portable = Get-ChildItem "dist-electron" -Filter "*.exe" |
-            Where-Object { $_.Name -notmatch 'Setup' } |
+          $portable = Get-ChildItem -Path . -Recurse -Filter "*.exe" |
+            Where-Object {
+              $_.FullName -notmatch '\\node_modules\\' -and
+              $_.Name -match '^Mayrichbe Manager.*\.exe$' -and
+              $_.Name -notmatch 'Setup'
+            } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
 
           if (-not $portable) {
-            throw "Portable EXE not found in dist-electron"
+            throw "Portable EXE not found after build"
           }
 
           Write-Host "Portable EXE: $($portable.FullName)"
@@ -130,5 +142,5 @@ jobs:
         with:
           name: mayrichbe-manager-windows-verified
           path: |
-            dist-electron/*.exe
-            dist-electron/*.blockmap
+            **/dist-electron/*.exe
+            **/dist-electron/*.blockmap
