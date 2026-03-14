@@ -65,8 +65,8 @@ jobs:
         shell: cmd
         run: |
           cd electron
-          npm ci
-          npm run build:win -- --publish never
+          call npm ci
+          call npm run build:win -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
