@@ -1,0 +1,176 @@
+name: Build Windows Web Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-web:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build frontend
+        shell: cmd
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create Windows Web package
+        shell: cmd
+        run: |
+          mkdir dist-web-windows
+          mkdir dist-web-windows\Mayrichbe-Manager-Web
+
+          echo Creating START_WINDOWS.bat...
+          (
+            echo @echo off
+            echo chcp 65001 ^>nul
+            echo setlocal EnableExtensions EnableDelayedExpansion
+            echo title Mayrichbe Manager - Windows Web Launcher
+            echo.
+            echo echo ========================================
+            echo echo   Mayrichbe Manager - Windows Web Mode
+            echo echo ========================================
+            echo echo.
+            echo.
+            echo set "ROOT=%%~dp0"
+            echo set "BACKEND=%%ROOT%%backend"
+            echo if not exist "%%BACKEND%%\app\main.py" ^(
+            echo   echo [ERROR] backend folder not found.
+            echo   goto :END_FAIL
+            echo ^)
+            echo.
+            echo if not exist "%%BACKEND%%\static\index.html" ^(
+            echo   echo [ERROR] frontend static file missing.
+            echo   goto :END_FAIL
+            echo ^)
+            echo.
+            echo call :DETECT_PYTHON
+            echo if errorlevel 1 goto :END_FAIL
+            echo.
+            echo cd /d "%%BACKEND%%"
+            echo.
+            echo if not exist ".venv\Scripts\python.exe" ^(
+            echo   echo [1/5] Creating virtual environment...
+            echo   %%PY_CMD%% -m venv .venv
+            echo ^)
+            echo.
+            echo set "VENV_PY=%%BACKEND%%\.venv\Scripts\python.exe"
+            echo.
+            echo echo [2/5] Installing Python dependencies...
+            echo "%%VENV_PY%%" -m pip install --upgrade pip setuptools wheel ^>nul 2^>^&1
+            echo "%%VENV_PY%%" -m pip install -r requirements.txt --timeout 120
+            echo if errorlevel 1 goto :END_FAIL
+            echo.
+            echo if not exist ".playwright_chromium_ready" ^(
+            echo   echo [3/5] Installing Playwright Chromium...
+            echo   "%%VENV_PY%%" -m playwright install chromium
+            echo   if errorlevel 1 goto :END_FAIL
+            echo   type nul ^> ".playwright_chromium_ready"
+            echo ^)
+            echo.
+            echo if not exist ".env" ^(
+            echo   if exist ".env.example" copy ".env.example" ".env" ^>nul
+            echo ^)
+            echo.
+            echo echo [4/5] Initializing database...
+            echo "%%VENV_PY%%" -c "from app.db.init_db import init_db; init_db()"
+            echo if errorlevel 1 goto :END_FAIL
+            echo.
+            echo echo [5/5] Starting web server...
+            echo start "" http://127.0.0.1:8000
+            echo echo.
+            echo echo URL: http://127.0.0.1:8000
+            echo echo Close this window to stop the app.
+            echo echo.
+            echo "%%VENV_PY%%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+            echo goto :EOF
+            echo.
+            echo :DETECT_PYTHON
+            echo set "PY_CMD="
+            echo py -3.11 --version ^>nul 2^>^&1
+            echo if not errorlevel 1 ^(
+            echo   set "PY_CMD=py -3.11"
+            echo   goto :EOF
+            echo ^)
+            echo py -3 --version ^>nul 2^>^&1
+            echo if not errorlevel 1 ^(
+            echo   set "PY_CMD=py -3"
+            echo   goto :EOF
+            echo ^)
+            echo python --version ^>nul 2^>^&1
+            echo if not errorlevel 1 ^(
+            echo   set "PY_CMD=python"
+            echo   goto :EOF
+            echo ^)
+            echo echo [ERROR] Python 3.11+ not found.
+            echo exit /b 1
+            echo.
+            echo :END_FAIL
+            echo echo.
+            echo echo Startup failed.
+            echo echo.
+            echo pause
+            echo exit /b 1
+          ) > dist-web-windows\Mayrichbe-Manager-Web\START_WINDOWS.bat
+
+          echo Creating README...
+          (
+            echo # Mayrichbe Manager - Windows Web Version
+            echo.
+            echo ## Quick Start
+            echo.
+            echo 1. Install Python 3.11+ ^(check "Add Python to PATH"^)
+            echo 2. Double-click START_WINDOWS.bat
+            echo 3. Browser will open http://127.0.0.1:8000
+            echo.
+            echo ## Requirements
+            echo.
+            echo - Windows 10/11
+            echo - Python 3.11 or 3.12
+            echo.
+            echo ## First Run
+            echo.
+            echo The script will automatically:
+            echo - Create virtual environment
+            echo - Install dependencies
+            echo - Install Playwright Chromium
+            echo - Initialize database
+            echo - Start web server
+            echo.
+          ) > dist-web-windows\Mayrichbe-Manager-Web\README.txt
+
+      - name: Copy backend files
+        shell: cmd
+        run: |
+          xcopy /E /I /Y backend dist-web-windows\Mayrichbe-Manager-Web\backend
+          rmdir /S /Q dist-web-windows\Mayrichbe-Manager-Web\backend\.venv 2>nul
+          rmdir /S /Q dist-web-windows\Mayrichbe-Manager-Web\backend\__pycache__ 2>nul
+          del /Q dist-web-windows\Mayrichbe-Manager-Web\backend\social_manager.db 2>nul
+          mkdir dist-web-windows\Mayrichbe-Manager-Web\backend\uploads 2>nul
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist-web-windows\Mayrichbe-Manager-Web\*" -DestinationPath "dist-web-windows\Mayrichbe-Manager-Web.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayrichbe-manager-windows-web
+          path: dist-web-windows/Mayrichbe-Manager-Web.zip
+          retention-days: 7
