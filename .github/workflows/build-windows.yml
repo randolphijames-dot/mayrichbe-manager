@@ -1,71 +1,134 @@
-name: Build Windows EXE
+name: Build Windows (Verified)
 
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
+    timeout-minutes: 45
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: |
             frontend/package-lock.json
             electron/package-lock.json
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Build Frontend
+      - name: Build frontend
         run: |
           cd frontend
           npm ci
           npm run build
+        env:
+          CI: true
 
-      - name: Install Python Dependencies
-        run: |
-          pip install pyinstaller
-          pip install -r backend/requirements.txt
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Build Python Backend (PyInstaller)
+      - name: Build Python backend (PyInstaller)
+        shell: cmd
         run: |
           cd backend
-          pyinstaller --onedir --name backend_win `
-            --collect-all "app" `
-            --collect-all "instagrapi" `
-            --hidden-import "apscheduler.triggers.date" `
-            --hidden-import "apscheduler.jobstores.sqlalchemy" `
-            --hidden-import "apscheduler.executors.pool" `
-            --noconfirm `
-            --distpath ../electron/backend-dist `
-            run_server.py
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --upgrade pip setuptools wheel
+          .venv\Scripts\python -m pip install -r requirements.txt
+          .venv\Scripts\python -m pip install pyinstaller
+          .venv\Scripts\pyinstaller backend_win.spec --noconfirm --clean
+          copy dist\backend_win.exe backend_win.exe
+          if not exist backend_win.exe (
+            echo backend_win.exe not found after build
+            exit /b 1
+          )
 
-      - name: Copy backend_win folder to backend
+      - name: Ensure Windows icon
+        shell: pwsh
         run: |
-          if (Test-Path backend/backend_win) { Remove-Item -Recurse -Force backend/backend_win }
-          Copy-Item -Recurse electron/backend-dist/backend_win backend/
+          if (!(Test-Path "electron/assets/icon.ico")) {
+            New-Item -ItemType Directory -Force -Path "electron/assets" | Out-Null
+            Invoke-WebRequest -Uri "https://www.w3.org/favicon.ico" -OutFile "electron/assets/icon.ico" -UseBasicParsing
+          }
 
-      - name: Install Electron dependencies
-        run: cd electron && npm ci
-
-      - name: Build Electron (Windows)
-        run: cd electron && npm run build:win
+      - name: Build Electron package (Windows)
+        shell: cmd
+        run: |
+          cd electron
+          npm ci
+          npx electron-builder --win --x64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows Installer
+      - name: Smoke test portable EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $portable = Get-ChildItem "dist-electron" -Filter "*.exe" |
+            Where-Object { $_.Name -notmatch 'Setup' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $portable) {
+            throw "Portable EXE not found in dist-electron"
+          }
+
+          Write-Host "Portable EXE: $($portable.FullName)"
+          $appProcess = Start-Process -FilePath $portable.FullName -PassThru
+
+          try {
+            $deadline = (Get-Date).AddMinutes(3)
+            $healthy = $false
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $healthResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 3
+                if ($healthResp.status -eq "ok") {
+                  $healthy = $true
+                  break
+                }
+              }
+              catch {
+                Start-Sleep -Seconds 2
+              }
+            }
+
+            if (-not $healthy) {
+              throw "Health check failed: backend not ready within 3 minutes"
+            }
+
+            $index = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -TimeoutSec 5 -UseBasicParsing
+            if ($index.StatusCode -ne 200) {
+              throw "Index check failed: status code $($index.StatusCode)"
+            }
+
+            if ($index.Content -notmatch '<!doctype html' -and $index.Content -notmatch '<html') {
+              throw "Index check failed: unexpected content"
+            }
+
+            Write-Host "Smoke test passed"
+          }
+          finally {
+            if ($appProcess -and -not $appProcess.HasExited) {
+              Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+            Get-Process backend_win -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload verified Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Mayrichbe-Manager-Windows
+          name: mayrichbe-manager-windows-verified
           path: |
             dist-electron/*.exe
-            dist-electron/*.zip
+            dist-electron/*.blockmap
