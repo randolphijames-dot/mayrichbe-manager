@@ -76,7 +76,7 @@
               <div class="flex flex-col gap-0.5">
                 <span class="text-xs font-medium" style="color:var(--text-primary)">{{ row.account.username }}</span>
                 <span class="text-xs" style="color:var(--text-faint)">{{ row.account.name }}</span>
-                <span v-if="!row.account.ins_password_encrypted" class="badge badge-red" style="font-size:9px; width:fit-content">需密码</span>
+                <span v-if="!row.account.has_password" class="badge badge-red" style="font-size:9px; width:fit-content">需密码</span>
               </div>
             </td>
             <!-- 分组 -->
@@ -194,7 +194,7 @@ function statusLabel(s: string) {
 }
 
 async function executeAll() {
-  const toRun = rows.value.filter(r => r.selected && (r.newBio || r.avatarFile) && r.account.ins_password_encrypted)
+  const toRun = rows.value.filter(r => r.selected && (r.newBio || r.avatarFile) && r.account.has_password)
   if (!toRun.length) { alert('没有可执行的账号（需勾选账号、填写内容、且已存储密码）'); return }
   if (!confirm(`将对 ${toRun.length} 个账号执行操作，继续吗？`)) return
 

@@ -87,10 +87,11 @@ class InstagramLoginService:
         
         返回值：InstagramLoginStatus 枚举值
         
-        登录成功后 Cookie 自动保存到 AdsPower Profile，
+        登录成功后 Cookie 自动保存到浏览器 Profile，
         下次打开同一 Profile 时无需重新登录。
         """
-        await page.goto(self.INS_LOGIN, wait_until="networkidle", timeout=30000)
+        # 有些网络环境下 IG 长时间保持长连接，networkidle 很难达成，这里放宽为 domcontentloaded 并拉长超时时间
+        await page.goto(self.INS_LOGIN, wait_until="domcontentloaded", timeout=60000)
         await human_delay(2000, 4000)
 
         # 随机浏览一会儿（模拟真人进入）
@@ -111,9 +112,13 @@ class InstagramLoginService:
         login_btn = page.locator('button[type="submit"]').first
         await login_btn.click()
 
-        # 等待页面变化（最多 15 秒）
+        # 等待页面变化：先简单等待 + domcontentloaded，避免因长期长连接导致 networkidle 超时
         await asyncio.sleep(3)
-        await page.wait_for_load_state("networkidle", timeout=15000)
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=30000)
+        except Exception:
+            # 即便未达到 domcontentloaded，也继续后续检查，由后续逻辑判断是否登录成功
+            pass
         await human_delay(2000, 4000)
 
         # 检测登录结果
@@ -187,14 +192,23 @@ class InstagramLoginService:
         self,
         page: Page,
         username: str,
-        password: str,
+        password: Optional[str] = None,
         totp_secret: Optional[str] = None,
     ) -> bool:
         """
         确保账号已登录（先检查，未登录则执行登录）。
         返回 True 表示已登录可操作。
+        
+        如果浏览器已登录，password 可以为 None。
+        如果未登录且没有 password，会抛出错误提示手动登录。
         """
         status = await self.check_login_status(page)
+
+        # 如果当前已经在 instagram.com 主页（例如用户手动登录后停留在首页），
+        # 即便 check_login_status 返回的是 UNKNOWN，也直接视为已登录。
+        current_url = page.url or ""
+        if "instagram.com" in current_url and "/accounts/login" not in current_url:
+            return True
 
         if status == InstagramLoginStatus.LOGGED_IN:
             return True
@@ -203,7 +217,11 @@ class InstagramLoginService:
             raise RuntimeError(f"账号 {username} 已被封禁")
 
         if status in (InstagramLoginStatus.CAPTCHA, InstagramLoginStatus.CHECKPOINT):
-            raise RuntimeError(f"账号 {username} 需要人工验证（{status}），请在 AdsPower 中手动处理后重试")
+            raise RuntimeError(f"账号 {username} 需要人工验证（{status}），请在比特浏览器中手动处理后重试")
+
+        # 未登录但没有密码
+        if not password:
+            raise RuntimeError(f"账号 {username} 未登录，且未配置密码。请在比特浏览器中手动登录，或在系统中配置密码")
 
         if status == InstagramLoginStatus.NEEDS_LOGIN:
             result = await self.login(page, username, password, totp_secret)

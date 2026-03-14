@@ -54,6 +54,9 @@ class Material(Base):
     # 文件夹标签（按日期/主题分组，如 "2026-03-10"）
     folder_tag = Column(String(50), nullable=True, index=True)
 
+    # 内容标签（JSON数组字符串，如 ["热点", "教程", "促销"]）
+    tags = Column(Text, nullable=True, comment="素材标签，JSON数组")
+
     # 元信息
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

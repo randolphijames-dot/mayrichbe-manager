@@ -18,7 +18,8 @@ class BatchTaskCreate(BaseModel):
     """批量创建任务：一个素材 × 多个账号"""
     material_id: int
     account_ids: List[int]
-    scheduled_at: datetime
+    scheduled_at: Optional[datetime] = None
+    instant: bool = Field(default=False, description="立即执行（忽略 scheduled_at）")
     random_offset_minutes: int = Field(default=30, ge=0, le=120)
     notes: Optional[str] = None
 

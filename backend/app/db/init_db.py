@@ -8,6 +8,7 @@ from app.models.material import Material, material_account_association  # noqa
 from app.models.task import PublishTask  # noqa
 from app.models.log import PublishLog  # noqa
 from app.models.oauth_state import OAuthState  # noqa
+from app.models.post_metric import PostMetricSnapshot  # noqa
 
 
 def init_db() -> None:

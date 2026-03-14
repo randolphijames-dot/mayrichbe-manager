@@ -1,5 +1,74 @@
 <template>
   <div class="flex flex-col gap-4">
+    <!-- 账号健康面板 -->
+    <div class="grid grid-cols-5 gap-3">
+      <!-- 总账号数 -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs" style="color:var(--text-faint)">总账号数</span>
+          <Users :size="16" style="color:var(--text-muted)" />
+        </div>
+        <div class="text-2xl font-bold" style="color:var(--text-primary)">{{ healthStats.total }}</div>
+        <div class="text-xs mt-1" style="color:var(--text-muted)">
+          活跃 {{ healthStats.active }}
+        </div>
+      </div>
+
+      <!-- 状态正常 -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs" style="color:var(--text-faint)">状态正常</span>
+          <div class="w-2 h-2 rounded-full bg-green-500"></div>
+        </div>
+        <div class="text-2xl font-bold" style="color:#4ade80">{{ healthStats.statusActive }}</div>
+        <div class="text-xs mt-1" style="color:var(--text-muted)">
+          占比 {{ healthStats.statusActivePercent }}%
+        </div>
+      </div>
+
+      <!-- 异常账号 -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs" style="color:var(--text-faint)">异常账号</span>
+          <div class="w-2 h-2 rounded-full bg-red-500"></div>
+        </div>
+        <div class="text-2xl font-bold" :style="healthStats.abnormal > 0 ? 'color:#f87171' : 'color:var(--text-muted)'">
+          {{ healthStats.abnormal }}
+        </div>
+        <div class="text-xs mt-1" style="color:var(--text-faint)">
+          封禁 {{ healthStats.suspended }} · 限流 {{ healthStats.limited }}
+        </div>
+      </div>
+
+      <!-- 7天成功率 -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs" style="color:var(--text-faint)">7天成功率</span>
+          <span class="text-xs" style="color:var(--text-faint)">📊</span>
+        </div>
+        <div class="text-2xl font-bold" :style="healthStats.successRate7d >= 80 ? 'color:#4ade80' : healthStats.successRate7d >= 50 ? 'color:#fbbf24' : 'color:#f87171'">
+          {{ healthStats.successRate7d }}%
+        </div>
+        <div class="text-xs mt-1" style="color:var(--text-muted)">
+          成功 {{ healthStats.success7d }} / 总计 {{ healthStats.total7d }}
+        </div>
+      </div>
+
+      <!-- 配置完整度 -->
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs" style="color:var(--text-faint)">配置完整度</span>
+          <span class="text-xs" style="color:var(--text-faint)">⚙️</span>
+        </div>
+        <div class="text-2xl font-bold" :style="healthStats.configComplete >= 80 ? 'color:#4ade80' : 'color:#fbbf24'">
+          {{ healthStats.configComplete }}%
+        </div>
+        <div class="text-xs mt-1" style="color:var(--text-muted)">
+          代理 {{ healthStats.withProxy }} · 密码 {{ healthStats.withPassword }}
+        </div>
+      </div>
+    </div>
+
     <!-- 工具栏 -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
@@ -7,6 +76,10 @@
           <option value="">全部平台</option>
           <option value="instagram">📸 Instagram</option>
           <option value="youtube">▶ YouTube</option>
+        </select>
+        <select v-model="filterGroup" class="input text-sm" style="width:140px">
+          <option value="">全部分组</option>
+          <option v-for="group in allGroups" :key="group" :value="group">📁 {{ group }}</option>
         </select>
         <select v-model="filterStatus" class="input text-sm" style="width:120px">
           <option value="">全部状态</option>
@@ -46,6 +119,7 @@
             <th style="width:50px">ID</th>
             <th>账号名</th>
             <th>用户名</th>
+            <th style="width:100px">分组</th>
             <th style="width:120px">平台</th>
             <th style="width:100px">状态</th>
             <th style="width:80px">代理</th>
@@ -58,6 +132,10 @@
             <td class="text-xs" style="color:var(--text-faint)">{{ account.id }}</td>
             <td class="font-medium" style="color:var(--text-primary)">{{ account.name }}</td>
             <td class="font-mono text-xs">@{{ account.username }}</td>
+            <td>
+              <span v-if="account.group_name" class="badge badge-blue">📁 {{ account.group_name }}</span>
+              <span v-else class="text-xs" style="color:var(--text-faint)">未分组</span>
+            </td>
             <td>
               <span class="badge" :class="account.platform === 'instagram' ? 'badge-pink' : 'badge-red'">
                 {{ account.platform === 'instagram' ? '📸 Instagram' : '▶ YouTube' }}
@@ -168,6 +246,23 @@
               </p>
             </div>
 
+            <!-- 指纹浏览器：密码 + TOTP（用于自动登录/重登）-->
+            <div v-if="form.platform === 'instagram' && (form.publish_method === 'adspower' || form.publish_method === 'bitbrowser')" class="flex flex-col gap-3 p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
+              <div class="flex items-center gap-2">
+                <span class="badge badge-blue">🔐 登录凭证</span>
+                <span class="text-xs" style="color:var(--text-faint)">用于检查登录状态和自动重登</span>
+              </div>
+              <div>
+                <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">Instagram 密码 *</label>
+                <input v-model="form.ins_password" type="password" class="input text-sm" placeholder="密码（加密存储）" autocomplete="new-password" />
+              </div>
+              <div>
+                <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">TOTP 密钥（可选）</label>
+                <input v-model="form.ins_totp_secret" type="text" class="input font-mono text-sm" placeholder="两步验证密钥（如有）" />
+                <p class="text-xs mt-1" style="color:var(--text-faint)">如果开启了两步验证，填写 TOTP 密钥</p>
+              </div>
+            </div>
+
             <!-- instagrapi：密码 + TOTP -->
             <div v-if="form.platform === 'instagram' && form.publish_method === 'instagrapi'" class="p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
               <div class="flex items-center gap-2 mb-3">
@@ -243,13 +338,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue'
 import { Plus, Upload, RefreshCw, Users, X } from 'lucide-vue-next'
-import { accountsApi, youtubeApi } from '@/api'
+import { accountsApi, youtubeApi, tasksApi } from '@/api'
+import dayjs from 'dayjs'
 
 const loading = ref(false)
 const submitting = ref(false)
 const accounts = ref<any[]>([])
+const tasks = ref<any[]>([])
 const filterPlatform = ref('')
 const filterStatus = ref('')
+const filterGroup = ref('')
 const showModal = ref(false)
 const editRecord = ref<any>(null)
 const checkingId = ref<number | null>(null)
@@ -270,13 +368,55 @@ const formDefault = () => ({
 })
 const form = reactive(formDefault())
 
+// 所有分组列表
+const allGroups = computed(() => {
+  const groups = new Set<string>()
+  accounts.value.forEach(a => {
+    if (a.group_name) groups.add(a.group_name)
+  })
+  return Array.from(groups).sort()
+})
+
 const filteredAccounts = computed(() =>
   accounts.value.filter(a => {
     if (filterPlatform.value && a.platform !== filterPlatform.value) return false
     if (filterStatus.value && a.status !== filterStatus.value) return false
+    if (filterGroup.value && a.group_name !== filterGroup.value) return false
     return true
   })
 )
+
+// 健康统计
+const healthStats = computed(() => {
+  const total = accounts.value.length
+  const active = accounts.value.filter(a => a.is_active).length
+  const statusActive = accounts.value.filter(a => a.status === 'active').length
+  const suspended = accounts.value.filter(a => a.status === 'suspended').length
+  const limited = accounts.value.filter(a => a.status === 'limited').length
+  const abnormal = suspended + limited
+  const statusActivePercent = total > 0 ? Math.round((statusActive / total) * 100) : 0
+
+  // 7天内的任务统计
+  const sevenDaysAgo = dayjs().subtract(7, 'day')
+  const tasks7d = tasks.value.filter(t => dayjs(t.scheduled_at).isAfter(sevenDaysAgo))
+  const total7d = tasks7d.length
+  const success7d = tasks7d.filter(t => t.status === 'success').length
+  const successRate7d = total7d > 0 ? Math.round((success7d / total7d) * 100) : 0
+
+  // 配置完整度
+  const withProxy = accounts.value.filter(a => a.proxy).length
+  const withPassword = accounts.value.filter(a => a.has_password).length
+  const configCount = withProxy + withPassword
+  const maxConfig = total * 2 // 每个账号理论上有2个配置项（代理+密码）
+  const configComplete = maxConfig > 0 ? Math.round((configCount / maxConfig) * 100) : 0
+
+  return {
+    total, active, statusActive, statusActivePercent,
+    suspended, limited, abnormal,
+    success7d, total7d, successRate7d,
+    withProxy, withPassword, configComplete
+  }
+})
 
 function statusDot(s: string) {
   return { active: 'bg-green-500', suspended: 'bg-red-500', limited: 'bg-yellow-500', unknown: 'bg-gray-600' }[s] || 'bg-gray-600'
@@ -295,8 +435,16 @@ function showToast(message: string, type = 'success') {
 
 async function loadAccounts() {
   loading.value = true
-  try { accounts.value = await accountsApi.list({ limit: 500 }) as any[] }
-  finally { loading.value = false }
+  try {
+    const [accountsData, tasksData] = await Promise.all([
+      accountsApi.list({ limit: 500 }),
+      tasksApi.list({ limit: 1000 })
+    ])
+    accounts.value = accountsData as any[]
+    tasks.value = tasksData as any[]
+  } finally {
+    loading.value = false
+  }
 }
 
 function openCreate() {

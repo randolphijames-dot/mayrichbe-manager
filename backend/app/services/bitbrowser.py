@@ -30,12 +30,12 @@ class BitBrowserClient:
     def open_browser(self, profile_id: str) -> Dict[str, Any]:
         """
         启动浏览器窗口。
-        返回 {"http": "http://127.0.0.1:PORT", "driver": "...", "webSocketDebuggerUrl": "..."}
+        返回 {"http": "http://127.0.0.1:PORT", "driver": "...", "ws": "..."} 统一给上层使用。
         """
         result = self._post("/browser/open", {"id": profile_id})
         data = result.get("data", {})
-        # 转换为与 AdsPower 统一的格式
-        ws_url = data.get("webSocketDebuggerUrl", "")
+        # BitBrowser 返回字段为 ws / http / driver
+        ws_url = data.get("ws") or data.get("webSocketDebuggerUrl", "")
         return {
             "ws": {"puppeteer": ws_url},
             "webdriver": data.get("driver", ""),

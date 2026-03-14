@@ -28,3 +28,14 @@ backend/build/
 *.log
 .idea/
 .vscode/
+
+# Local development
+dist-web-windows/
+dist-windows-github/
+_bmad/
+_bmad-output/
+.claude/
+debug_screens/
+Mayrichbe-Manager-Windows/
+Mayrichbe_Manager_Windows.zip
+*.exe

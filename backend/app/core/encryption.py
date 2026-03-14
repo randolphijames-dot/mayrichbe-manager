@@ -19,13 +19,14 @@ def encrypt(plaintext: str) -> str:
     生产建议换 cryptography.fernet
     """
     try:
-        from cryptography.fernet import Fernet
-        import base64
+        # 优先使用 cryptography.fernet 做真正的加密存储
+        from cryptography.fernet import Fernet  # type: ignore
         key = base64.urlsafe_b64encode(_get_key())
         f = Fernet(key)
         return f.encrypt(plaintext.encode()).decode()
     except ImportError:
         # fallback：简单 XOR 混淆（不安全，仅为兼容）
+        # 注意：这里不能再 import base64，否则在 ImportError 分支里会因为局部变量作用域导致 UnboundLocalError
         key = _get_key()
         encoded = bytearray()
         for i, c in enumerate(plaintext.encode()):
@@ -44,8 +45,8 @@ def decrypt(ciphertext: str) -> str:
                 decoded.append(c ^ key[i % len(key)])
             return decoded.decode()
 
-        from cryptography.fernet import Fernet
-        import base64
+        # 尝试用 cryptography.fernet 解密
+        from cryptography.fernet import Fernet  # type: ignore
         key = base64.urlsafe_b64encode(_get_key())
         f = Fernet(key)
         return f.decrypt(ciphertext.encode()).decode()

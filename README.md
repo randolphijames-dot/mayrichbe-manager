@@ -76,6 +76,24 @@ name,username,platform,proxy,adspower_profile_id,notes
 | `YT_CLIENT_ID` | Google Cloud OAuth Client ID |
 | `YT_CLIENT_SECRET` | Google Cloud OAuth Client Secret |
 
+## 桌面版安装包（Windows）
+
+Windows 安装包需在 Windows 环境构建（PyInstaller 无法跨平台）。
+
+**方式一：GitHub Actions（推荐）**
+1. 将本仓库推送到 GitHub（`main` 或 `master` 分支）
+2. 打开仓库 → **Actions** → 选择 **Build Windows** 工作流
+3. 点击 **Run workflow** 运行（或推送后自动触发）
+4. 完成后在 **Artifacts** 中下载 `mayrichbe-manager-windows`，解压得到 `.exe` 安装包
+
+**方式二：在 Windows 本机构建**
+- 安装 Python 3.11、Node.js 20
+- 在项目根目录执行：`electron\scripts\build-backend.bat` 打包后端
+- 将 `electron\backend-dist\backend_win.exe` 复制到 `backend\backend_win.exe`
+- 构建前端后执行：`cd electron && npm run build:win`
+
+**兼容与乱码**：安装包已设置 UTF-8（`PYTHONIOENCODING`、SQLite 路径正斜杠），界面与 Mac 版一致；若遇乱码请确认系统区域为中文或 UTF-8。
+
 ## 注意事项
 
 1. Instagram 通过 AdsPower + Playwright 操控浏览器发布，需本地安装并运行 AdsPower

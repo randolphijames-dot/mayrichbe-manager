@@ -1,12 +1,38 @@
 <template>
   <div class="flex flex-col gap-4">
-    <!-- 月份导航 -->
+    <!-- 视图切换 + 月份导航 -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <button class="btn btn-ghost btn-sm" @click="prevMonth"><ChevronLeft :size="14" /></button>
-        <h2 class="text-base font-semibold" style="color:var(--text-primary)">{{ currentMonthLabel }}</h2>
-        <button class="btn btn-ghost btn-sm" @click="nextMonth"><ChevronRight :size="14" /></button>
+        <!-- 视图模式切换 -->
+        <div class="flex gap-1 p-1 rounded-lg" style="background:var(--bg-hover)">
+          <button
+            class="btn btn-sm"
+            :class="viewMode === 'calendar' ? 'btn-primary' : 'btn-ghost'"
+            @click="viewMode = 'calendar'"
+          >日历视图</button>
+          <button
+            class="btn btn-sm"
+            :class="viewMode === 'account' ? 'btn-primary' : 'btn-ghost'"
+            @click="viewMode = 'account'"
+          >账号×日期</button>
+        </div>
+
+        <div class="w-px h-5" style="background:var(--border)"></div>
+
+        <!-- 日期导航 -->
+        <button class="btn btn-ghost btn-sm" @click="prevPeriod"><ChevronLeft :size="14" /></button>
+        <h2 class="text-base font-semibold" style="color:var(--text-primary)">{{ currentPeriodLabel }}</h2>
+        <button class="btn btn-ghost btn-sm" @click="nextPeriod"><ChevronRight :size="14" /></button>
         <button class="btn btn-secondary btn-sm" @click="goToday">今天</button>
+
+        <!-- 账号视图专用：分组筛选 -->
+        <template v-if="viewMode === 'account'">
+          <div class="w-px h-5" style="background:var(--border)"></div>
+          <select v-model="filterGroup" class="input text-sm" style="width:130px">
+            <option value="">全部分组</option>
+            <option v-for="g in allGroups" :key="g" :value="g">{{ g }}</option>
+          </select>
+        </template>
       </div>
       <div class="flex items-center gap-2 text-xs" style="color:var(--text-faint)">
         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:#0ea5e9"></span>排队/等待</span>
@@ -16,8 +42,8 @@
       </div>
     </div>
 
-    <!-- 日历网格 -->
-    <div class="card" style="padding:0; overflow:hidden">
+    <!-- 日历视图：月度日历网格 -->
+    <div v-if="viewMode === 'calendar'" class="card" style="padding:0; overflow:hidden">
       <!-- 星期标题 -->
       <div class="grid" style="grid-template-columns: repeat(7, 1fr); border-bottom:1px solid var(--border)">
         <div v-for="d in weekDays" :key="d" class="text-center py-2 text-xs font-semibold" style="color:var(--text-faint)">{{ d }}</div>
@@ -53,6 +79,64 @@
             <span v-if="cell.tasks.length > 3" class="text-xs" style="color:var(--text-faint)">+{{ cell.tasks.length - 3 }} 更多</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 账号视图：账号×日期二维表格 -->
+    <div v-else-if="viewMode === 'account'" class="card" style="padding:0; overflow:auto; max-height:700px">
+      <table class="table" style="min-width:100%">
+        <thead style="position:sticky; top:0; z-index:10; background:var(--bg-card)">
+          <tr>
+            <th style="min-width:150px; position:sticky; left:0; background:var(--bg-card); z-index:11">账号</th>
+            <th v-for="date in accountViewDates" :key="date" style="min-width:130px; text-align:center">
+              <div class="flex flex-col items-center gap-0.5">
+                <span class="text-xs" style="color:var(--text-muted)">{{ dayjs(date).format('MM-DD') }}</span>
+                <span class="text-xs font-normal" style="color:var(--text-faint)">{{ weekDays[dayjs(date).day()] }}</span>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="account in displayedAccounts" :key="account.id">
+            <td style="position:sticky; left:0; background:var(--bg-card); z-index:9">
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                  <span class="badge" :class="account.platform === 'instagram' ? 'badge-pink' : 'badge-red'">
+                    {{ account.platform === 'instagram' ? '📸' : '▶' }}
+                  </span>
+                  <span class="text-sm font-medium" style="color:var(--text-primary)">{{ account.username }}</span>
+                </div>
+                <span v-if="account.group_name" class="text-xs" style="color:var(--text-faint)">{{ account.group_name }}</span>
+              </div>
+            </td>
+            <td v-for="date in accountViewDates" :key="date" style="vertical-align:top; padding:8px">
+              <div class="flex flex-col gap-1">
+                <div
+                  v-for="task in getTasksForAccountDate(account.id, date)"
+                  :key="task.id"
+                  class="text-xs px-2 py-1 rounded cursor-pointer transition-all"
+                  :style="`background:${taskColor(task.status)}22; color:${taskColor(task.status)}; border:1px solid ${taskColor(task.status)}44`"
+                  :title="`素材#${task.material_id} - ${getStatusLabel(task.status)}`"
+                  @click="selectTask(task)"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    <span>{{ dayjs(task.scheduled_at).format('HH:mm') }}</span>
+                    <span>{{ getStatusEmoji(task.status) }}</span>
+                  </div>
+                </div>
+                <button
+                  v-if="getTasksForAccountDate(account.id, date).length === 0"
+                  class="text-xs px-2 py-1 rounded border transition-colors"
+                  style="border:1px dashed var(--border); color:var(--text-faint)"
+                  @click="createTaskForAccountDate(account.id, date)"
+                >+ 新建</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="displayedAccounts.length === 0" class="empty-state" style="padding:60px">
+        <CalendarDays :size="32" /><p class="text-sm">没有符合筛选条件的账号</p>
       </div>
     </div>
 
@@ -96,10 +180,62 @@ const tasks = ref<any[]>([])
 const accounts = ref<any[]>([])
 const currentDate = ref(dayjs())
 const selectedDay = ref<any>(null)
+const selectedTask = ref<any>(null)
 const loading = ref(false)
 
+// 视图模式：calendar（月度日历）或 account（账号×日期表格）
+const viewMode = ref<'calendar' | 'account'>('calendar')
+const filterGroup = ref('')
+
 const weekDays = ['日', '月', '火', '水', '木', '金', '土']
-const currentMonthLabel = computed(() => currentDate.value.format('YYYY年M月'))
+
+// 根据视图模式动态显示不同的标签
+const currentPeriodLabel = computed(() => {
+  if (viewMode.value === 'calendar') {
+    return currentDate.value.format('YYYY年M月')
+  } else {
+    // 账号视图显示7天范围
+    const start = currentDate.value
+    const end = currentDate.value.add(6, 'day')
+    if (start.month() === end.month()) {
+      return `${start.format('YYYY年M月D日')} - ${end.format('D日')}`
+    } else {
+      return `${start.format('M月D日')} - ${end.format('M月D日')}`
+    }
+  }
+})
+
+// 账号分组列表
+const allGroups = computed(() => {
+  const groups = new Set<string>()
+  accounts.value.forEach(a => {
+    if (a.group_name) groups.add(a.group_name)
+  })
+  return Array.from(groups).sort()
+})
+
+// 账号视图中显示的账号（根据分组筛选）
+const displayedAccounts = computed(() => {
+  let filtered = accounts.value.filter(a => a.is_active)
+  if (filterGroup.value) {
+    filtered = filtered.filter(a => a.group_name === filterGroup.value)
+  }
+  return filtered.sort((a, b) => {
+    // 按分组、平台、用户名排序
+    if (a.group_name !== b.group_name) return (a.group_name || '').localeCompare(b.group_name || '')
+    if (a.platform !== b.platform) return a.platform.localeCompare(b.platform)
+    return a.username.localeCompare(b.username)
+  })
+})
+
+// 账号视图的日期范围（未来7天）
+const accountViewDates = computed(() => {
+  const dates: string[] = []
+  for (let i = 0; i < 7; i++) {
+    dates.push(currentDate.value.add(i, 'day').format('YYYY-MM-DD'))
+  }
+  return dates
+})
 
 const accountMap = computed(() => {
   const m: Record<number, any> = {}
@@ -136,10 +272,42 @@ const calendarCells = computed(() => {
   return cells
 })
 
-function prevMonth() { currentDate.value = currentDate.value.subtract(1, 'month') }
-function nextMonth() { currentDate.value = currentDate.value.add(1, 'month') }
+// 导航函数（根据视图模式不同，步进不同）
+function prevPeriod() {
+  if (viewMode.value === 'calendar') {
+    currentDate.value = currentDate.value.subtract(1, 'month')
+  } else {
+    currentDate.value = currentDate.value.subtract(7, 'day')
+  }
+}
+function nextPeriod() {
+  if (viewMode.value === 'calendar') {
+    currentDate.value = currentDate.value.add(1, 'month')
+  } else {
+    currentDate.value = currentDate.value.add(7, 'day')
+  }
+}
 function goToday() { currentDate.value = dayjs() }
 function selectDay(cell: any) { selectedDay.value = cell }
+
+// 获取某个账号在某个日期的所有任务
+function getTasksForAccountDate(accountId: number, dateStr: string) {
+  return tasks.value.filter(t => {
+    return t.account_id === accountId && dayjs(t.scheduled_at).format('YYYY-MM-DD') === dateStr
+  }).sort((a, b) => dayjs(a.scheduled_at).diff(dayjs(b.scheduled_at)))
+}
+
+// 选中任务（可以后续扩展为弹窗编辑）
+function selectTask(task: any) {
+  selectedTask.value = task
+  alert(`任务详情：\n账号ID: ${task.account_id}\n素材ID: ${task.material_id}\n时间: ${dayjs(task.scheduled_at).format('YYYY-MM-DD HH:mm')}\n状态: ${getStatusLabel(task.status)}`)
+}
+
+// 为某个账号在某个日期创建新任务（占位功能）
+function createTaskForAccountDate(accountId: number, dateStr: string) {
+  alert(`功能开发中：\n将为账号 #${accountId} 在 ${dateStr} 创建新任务`)
+  // TODO: 实现创建任务弹窗
+}
 
 function taskColor(status: string) {
   return { success: '#4ade80', failed: '#f87171', running: '#a78bfa', queued: '#0ea5e9', pending: '#0ea5e9', cancelled: '#64748b' }[status] || '#64748b'
@@ -156,6 +324,9 @@ function getStatusBadge(s: string) {
 }
 function getStatusLabel(s: string) {
   return { success: '成功', failed: '失败', running: '执行中', queued: '排队', pending: '等待', cancelled: '取消' }[s] || s
+}
+function getStatusEmoji(s: string) {
+  return { success: '✓', failed: '✗', running: '⋯', queued: '⋯', pending: '◷', cancelled: '◌' }[s] || '○'
 }
 
 onMounted(async () => {

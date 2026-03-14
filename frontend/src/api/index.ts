@@ -131,4 +131,11 @@ export const toolsApi = {
   getSettings: () => api.get('/tools/settings'),
 }
 
+// 发布后统计
+export const analyticsApi = {
+  refresh: (params?: { days?: number; limit?: number }) => api.post('/analytics/refresh', null, { params }),
+  summary: (params?: { days?: number }) => api.get('/analytics/summary', { params }),
+  dailyRanking: (params?: { target_date?: string; limit?: number }) => api.get('/analytics/daily-ranking', { params }),
+}
+
 export default api

@@ -1,5 +1,6 @@
 """素材管理 API"""
 import os
+import json
 import mimetypes
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
@@ -122,6 +123,12 @@ def update_material(material_id: int, payload: MaterialUpdate, db: Session = Dep
 
     update_data = payload.model_dump(exclude_unset=True)
     account_ids = update_data.pop("target_account_ids", None)
+
+    # 处理tags：将列表转换为JSON字符串
+    if "tags" in update_data:
+        tags_list = update_data.pop("tags")
+        if tags_list is not None:
+            material.tags = json.dumps(tags_list, ensure_ascii=False) if tags_list else None
 
     for k, v in update_data.items():
         setattr(material, k, v)

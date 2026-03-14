@@ -59,4 +59,6 @@ class AccountImportRow(BaseModel):
     proxy: Optional[str] = None
     browser_type: Optional[str] = "adspower"
     browser_profile_id: Optional[str] = None
+    ins_password: Optional[str] = None  # Instagram密码（将自动加密存储）
+    ins_totp_secret: Optional[str] = None  # Instagram 2FA TOTP密钥
     notes: Optional[str] = None

@@ -10,8 +10,8 @@ from app.main import app as application
 def get_base_path():
     """获取基础路径（兼容 PyInstaller 打包后的路径）"""
     if getattr(sys, 'frozen', False):
-        # 打包后：exe 在 backend_win/ 目录，需要回到上一级（backend/）
-        return os.path.dirname(os.path.dirname(sys.executable))
+        # 打包后：exe 在 backend/ 目录（Mac: backend_mac, Win: backend_win.exe）
+        return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 

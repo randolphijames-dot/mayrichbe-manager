@@ -47,14 +47,25 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
 @router.post("/batch", response_model=List[TaskOut], status_code=status.HTTP_201_CREATED)
 def create_batch_tasks(payload: BatchTaskCreate, db: Session = Depends(get_db)):
     """批量创建任务：一个素材 × 多个账号（支持随机时间窗口）"""
+    from app.core.timezone import now_naive
+
+    # 立即执行模式：使用当前时间，不再叠加随机延迟
+    if payload.instant:
+        base_time = now_naive()
+        effective_random_offset = 0
+    else:
+        base_time = payload.scheduled_at
+        effective_random_offset = payload.random_offset_minutes
+
     tasks = []
     for account_id in payload.account_ids:
         # 在指定范围内随机偏移，避免同时发布被识别
+        # 立即执行模式下 effective_random_offset=0，不再引入额外延迟
         offset_minutes = 0
-        if payload.random_offset_minutes > 0:
-            offset_minutes = random.randint(0, payload.random_offset_minutes)
+        if effective_random_offset > 0:
+            offset_minutes = random.randint(0, effective_random_offset)
 
-        actual_scheduled = payload.scheduled_at + timedelta(minutes=offset_minutes)
+        actual_scheduled = base_time + timedelta(minutes=offset_minutes)
 
         task = PublishTask(
             account_id=account_id,
@@ -141,29 +152,35 @@ def retry_task(task_id: int, db: Session = Depends(get_db)):
 
 def _schedule_task(task: PublishTask, db: Session):
     """将任务提交到 APScheduler 调度器"""
-    from datetime import datetime, timezone
+    from app.core.timezone import now, make_aware
+    import logging
+    logger = logging.getLogger(__name__)
+
     try:
         from app.scheduler import schedule_publish_task
 
-        # 统一转换为带时区的 UTC 时间
-        if task.scheduled_at.tzinfo is None:
-            run_at = task.scheduled_at.replace(tzinfo=timezone.utc)
-        else:
-            run_at = task.scheduled_at
+        # 统一使用北京时间（+8）
+        run_at = make_aware(task.scheduled_at)
+        current = now()
 
-        now = datetime.now(timezone.utc)
-        if run_at <= now:
+        # 先标记为已入队，避免立即执行线程与当前事务互相覆盖状态
+        task.status = TaskStatus.QUEUED
+        task.error_message = None
+        db.commit()
+
+        logger.info(f"[Task #{task.id}] scheduled_at={run_at}, current={current}, diff={(run_at - current).total_seconds()}s")
+
+        if run_at <= current:
             # 已过期，立即以后台线程方式执行
+            logger.info(f"[Task #{task.id}] 立即执行（时间已过期）")
             import threading
             from app.scheduler import _run_publish_task
             threading.Thread(target=_run_publish_task, args=(task.id,), daemon=True).start()
         else:
+            logger.info(f"[Task #{task.id}] 定时调度到 {run_at}")
             schedule_publish_task(task.id, run_at)
-
-        task.status = TaskStatus.QUEUED
-        db.commit()
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"调度任务失败: {e}")
+        logger.error(f"[Task #{task.id}] 调度任务失败: {e}", exc_info=True)
+        task.status = TaskStatus.FAILED
         task.error_message = f"调度失败: {str(e)}"
         db.commit()

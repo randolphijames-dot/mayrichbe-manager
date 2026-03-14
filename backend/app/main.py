@@ -12,18 +12,18 @@ from app.api.v1.router import api_router
 
 def find_static_dir():
     """智能查找 static 目录（兼容开发/打包/Electron 环境）"""
-    # 候选路径（按优先级）
     candidates = [
-        os.environ.get('STATIC_DIR'),  # 环境变量指定
-        './static',  # 当前目录
-        '../static',  # 上一级
-        os.path.join(os.getcwd(), 'static'),  # 工作目录
-        os.path.join(os.path.dirname(__file__), '..', '..', 'static'),  # 相对 app 目录
+        os.environ.get('STATIC_DIR'),
+        './static',
+        os.path.join(os.getcwd(), 'static'),
+        os.path.join(os.path.dirname(__file__), '..', '..', 'static'),
     ]
-
-    # PyInstaller 打包后的特殊处理
+    # PyInstaller 打包后：static 在 _MEIPASS 或 backend/ 下
     if getattr(sys, 'frozen', False):
-        base = os.path.dirname(os.path.dirname(sys.executable))  # 回到 backend/
+        meipass = getattr(sys, '_MEIPASS', None)
+        if meipass:
+            candidates.insert(0, os.path.join(meipass, 'static'))
+        base = os.path.dirname(sys.executable)
         candidates.insert(0, os.path.join(base, 'static'))
 
     for path in candidates:
@@ -55,18 +55,18 @@ async def lifespan(app: FastAPI):
 
 def _restore_pending_tasks(scheduler, schedule_fn):
     """启动时恢复未执行的定时任务"""
-    from datetime import datetime, timezone
     from app.db.session import SessionLocal
+    from app.core.timezone import now, make_aware
     try:
         db = SessionLocal()
         from app.models.task import PublishTask
         pending = db.query(PublishTask).filter(
             PublishTask.status.in_(["pending", "queued"])
         ).all()
-        now = datetime.now(timezone.utc)
+        current = now()
         restored = 0
         for task in pending:
-            if task.scheduled_at and task.scheduled_at > now:
+            if task.scheduled_at and make_aware(task.scheduled_at) > current:
                 try:
                     schedule_fn(task.id, task.scheduled_at)
                     restored += 1
@@ -121,6 +121,13 @@ def health_check():
 
 # 注册 API 路由
 app.include_router(api_router)
+
+# Uploads 静态文件服务（素材文件访问）
+uploads_dir = os.path.abspath(settings.UPLOAD_DIR)
+if os.path.exists(uploads_dir):
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    import logging
+    logging.getLogger(__name__).info(f"[Main] Uploads目录已挂载: {uploads_dir}")
 
 # 静态文件服务（前端构建产物，挂载在最后，防止拦截 API 路由）
 static_dir = find_static_dir()

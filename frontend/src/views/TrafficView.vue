@@ -94,7 +94,7 @@
               :class="form.account_ids.includes(a.id) ? 'badge-pink' : 'badge-gray'"
               @click="toggleAccount(a.id)">
               📸 {{ a.username }}
-              <span v-if="!a.ins_password_encrypted" style="color:#f87171"> ⚠️</span>
+              <span v-if="!a.has_password" style="color:#f87171"> ⚠️</span>
             </button>
             <span v-if="insAccounts.length === 0" class="text-xs" style="color:var(--text-faint)">暂无 Instagram 账号</span>
           </div>
