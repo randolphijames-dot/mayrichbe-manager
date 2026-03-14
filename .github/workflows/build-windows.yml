@@ -53,14 +53,6 @@ jobs:
             exit /b 1
           )
 
-      - name: Ensure Windows icon
-        shell: pwsh
-        run: |
-          if (!(Test-Path "electron/assets/icon.ico")) {
-            New-Item -ItemType Directory -Force -Path "electron/assets" | Out-Null
-            Invoke-WebRequest -Uri "https://www.w3.org/favicon.ico" -OutFile "electron/assets/icon.ico" -UseBasicParsing
-          }
-
       - name: Build Electron package (Windows)
         shell: cmd
         run: |

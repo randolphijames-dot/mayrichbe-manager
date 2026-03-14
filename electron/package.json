@@ -29,7 +29,7 @@
         "to": "backend",
         "filter": [
           "backend_mac",
-          "backend_win/**",
+          "backend_win.exe",
           "static/**",
           "!__pycache__/**",
           "!**/*.pyc",
@@ -55,7 +55,6 @@
       "entitlementsInherit": "assets/entitlements.mac.plist"
     },
     "win": {
-      "icon": "assets/icon.ico",
       "target": [
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
