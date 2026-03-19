@@ -57,6 +57,12 @@ jobs:
           @echo off
           setlocal EnableExtensions EnableDelayedExpansion
 
+          if /I not "%~1"=="__RUN_IN_CMD" (
+            start "" cmd /k call "%~f0" __RUN_IN_CMD
+            exit /b 0
+          )
+          shift
+
           set "ROOT=%~dp0"
           cd /d "%ROOT%"
 
@@ -184,8 +190,18 @@ jobs:
           echo Keep this window open while app is running.
           echo.
           "%VENV_PY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            echo.
+            echo [ERROR] Web server exited unexpectedly.
+            echo [ERROR] Please check the log:
+            echo   %LOG_FILE%
+            echo.
+            pause
+            exit /b 1
+          )
           echo.
           echo [INFO] Server stopped. Log: %LOG_FILE%
+          pause
           goto :EOF
 
           :DETECT_PYTHON
