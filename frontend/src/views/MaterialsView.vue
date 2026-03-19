@@ -138,12 +138,19 @@
                 <!-- 图片预览 -->
                 <img
                   v-if="m.material_type === 'image'"
-                  :src="m.file_url"
+                  :src="m.thumbnail_url || m.file_url"
                   :alt="m.title"
                   class="w-full h-full object-cover"
                   @error="e => e.target.src = ''"
                 />
-                <!-- 视频预览（显示第一帧） -->
+                <!-- 视频优先显示后端生成的缩略图；没有时再回退视频元素 -->
+                <img
+                  v-else-if="m.material_type === 'video' && m.thumbnail_url"
+                  :src="m.thumbnail_url"
+                  :alt="m.title"
+                  class="w-full h-full object-cover"
+                  @error="e => e.target.style.display = 'none'"
+                />
                 <video
                   v-else-if="m.material_type === 'video'"
                   :src="m.file_url"
@@ -735,7 +742,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
 import { Upload, RefreshCw, X, Users, Zap, Trash2, Layers, FolderOpen, CheckSquare, ImageIcon, Move } from 'lucide-vue-next'
-import { materialsApi, accountsApi, tasksApi } from '@/api'
+import { materialsApi, accountsApi, tasksApi, showToast } from '@/api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -1012,6 +1019,7 @@ async function handleUpload() {
     showUploadModal.value = false
     uploadFile.value = null
     await loadAll()
+    showToast('素材上传成功，预览已刷新')
   } finally { uploading.value = false }
 }
 
@@ -1093,6 +1101,11 @@ async function submitTask() {
 
     await tasksApi.createBatch(payload)
     showTaskModal.value = false
+    showToast(
+      taskForm.instant
+        ? `已创建 ${taskForm.account_ids.length} 个任务，正在后台执行，可到「日志」查看结果`
+        : `已创建 ${taskForm.account_ids.length} 个定时任务`
+    )
   } finally { creatingTask.value = false }
 }
 
@@ -1135,6 +1148,7 @@ async function submitBoardPublish() {
   try {
     // 按素材分组，每个素材的所有账号一次 batch 请求
     const byMaterial = new Map<number, number[]>()
+    const selectionCount = boardSelections.value.size
     boardSelections.value.forEach((_, key) => {
       const [mid, aid] = key.split('_').map(Number)
       if (!byMaterial.has(mid)) byMaterial.set(mid, [])
@@ -1151,7 +1165,7 @@ async function submitBoardPublish() {
     }
     boardSelections.value.clear()
     showBoardModal.value = false
-    alert(`已创建 ${boardSelections.value.size || '全部'} 个发布任务！`)
+    showToast(`已创建 ${selectionCount} 组发布任务`)
   } finally { creatingTask.value = false }
 }
 

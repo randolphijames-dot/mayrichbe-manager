@@ -1,7 +1,10 @@
 """素材管理 API"""
-import os
 import json
+import logging
 import mimetypes
+import os
+import shutil
+import subprocess
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
@@ -13,9 +16,32 @@ from app.models.material import Material, MaterialType, MaterialStatus
 from app.schemas.material import MaterialCreate, MaterialUpdate, MaterialOut
 
 router = APIRouter(prefix="/materials", tags=["素材管理"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+
+
+def _resolve_mime_type(file: UploadFile) -> str:
+    """优先信任明确的 MIME；octet-stream 时回退到文件后缀。"""
+    guessed = mimetypes.guess_type(file.filename or "")[0]
+    uploaded = (file.content_type or "").strip().lower()
+    if uploaded and uploaded != "application/octet-stream":
+        return uploaded
+    return guessed or uploaded or "application/octet-stream"
+
+
+def _resolve_ffmpeg_executable() -> Optional[str]:
+    """查找 ffmpeg；如果系统没装，则回退到 imageio-ffmpeg 自带二进制。"""
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if ffmpeg_bin:
+        return ffmpeg_bin
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+        return get_ffmpeg_exe()
+    except Exception as exc:  # pragma: no cover - 仅在运行环境缺依赖时触发
+        logger.warning("[Materials] 未找到可用 ffmpeg: %s", exc)
+        return None
 
 
 @router.get("/", response_model=List[MaterialOut])
@@ -57,7 +83,7 @@ async def upload_material(
         raise HTTPException(status_code=413, detail=f"文件超过 {settings.MAX_FILE_SIZE_MB}MB 限制")
 
     # MIME 类型检查
-    mime_type = file.content_type or mimetypes.guess_type(file.filename)[0] or "application/octet-stream"
+    mime_type = _resolve_mime_type(file)
     allowed = ALLOWED_VIDEO_TYPES | ALLOWED_IMAGE_TYPES
     if mime_type not in allowed:
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {mime_type}")
@@ -78,17 +104,19 @@ async def upload_material(
     elif mime_type in ALLOWED_VIDEO_TYPES:
         # 视频提取第一帧作为缩略图
         try:
-            import subprocess
             thumb_filename = f"thumb_{safe_filename}.jpg"
             thumb_path = os.path.join(upload_dir, thumb_filename)
+            ffmpeg_bin = _resolve_ffmpeg_executable()
+            if not ffmpeg_bin:
+                raise RuntimeError("ffmpeg 不可用，无法生成视频缩略图")
             subprocess.run([
-                'ffmpeg', '-i', file_path, '-vframes', '1',
+                ffmpeg_bin, '-i', file_path, '-vframes', '1',
                 '-vf', 'scale=480:-1', '-q:v', '2', thumb_path
-            ], check=True, capture_output=True, timeout=10)
+            ], check=True, capture_output=True, timeout=10, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             thumbnail_path = thumb_path
         except Exception as e:
             # 缩略图生成失败不影响上传，只记录警告
-            print(f"[WARN] 缩略图生成失败: {e}")
+            logger.warning("[Materials] 缩略图生成失败: %s", e)
 
     # 解析账号 ID 列表
     account_ids = []

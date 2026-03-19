@@ -1,6 +1,7 @@
 """Instagram 发布服务（BitBrowser + Playwright，含防封号行为模拟）"""
 import asyncio
 import os
+import tempfile
 from typing import Optional
 from playwright.async_api import async_playwright, Page
 
@@ -12,6 +13,11 @@ from app.services.human_behavior import (
     human_delay, human_type, random_page_interaction, human_scroll
 )
 from app.models.material import Material, MaterialType
+
+
+def _temp_screenshot_path(filename: str) -> str:
+    """跨平台临时截图路径，避免 Windows 上硬编码 /tmp。"""
+    return os.path.join(tempfile.gettempdir(), filename)
 
 
 class InstagramPublisher:
@@ -314,7 +320,7 @@ async def _click_share(page: Page):
 
     except Exception as e:
         logger.error(f"❌ 点击 Share 按钮失败: {e}")
-        await page.screenshot(path="/tmp/ig_share_error.png", full_page=True)
+        await page.screenshot(path=_temp_screenshot_path("ig_share_error.png"), full_page=True)
         raise RuntimeError(f"无法点击 Share 按钮: {e}")
 
     # 只等待 2 秒（加快速度）
@@ -344,7 +350,7 @@ async def _check_publish_errors(page: Page):
         if await error_elem.is_visible(timeout=2000):
             error_text = await error_elem.text_content()
             logger.error(f"发布时出现错误提示: {error_text}")
-            screenshot_path = f"/tmp/ig_publish_error_{int(asyncio.get_event_loop().time())}.png"
+            screenshot_path = _temp_screenshot_path(f"ig_publish_error_{int(asyncio.get_event_loop().time())}.png")
             await page.screenshot(path=screenshot_path, full_page=True)
             raise RuntimeError(f"Instagram 发布失败: {error_text}。截图已保存至: {screenshot_path}")
 
@@ -373,7 +379,7 @@ async def _get_post_url(page: Page, username: str) -> str:
             logger.info("✅ 检测到「Share」对话框，发布成功！正在关闭对话框...")
 
             # 保存对话框截图
-            await page.screenshot(path="/tmp/ig_share_dialog.png", full_page=True)
+            await page.screenshot(path=_temp_screenshot_path("ig_share_dialog.png"), full_page=True)
 
             # 方案1：按 ESC 键关闭
             await page.keyboard.press("Escape")
@@ -434,7 +440,7 @@ async def _get_post_url(page: Page, username: str) -> str:
 
         # 没有找到链接，也没有检测到 Share 对话框，可能发布失败
         logger.error("未找到「查看帖子」链接，且未检测到 Share 对话框")
-        screenshot_path = f"/tmp/ig_publish_failed_{int(asyncio.get_event_loop().time())}.png"
+        screenshot_path = _temp_screenshot_path(f"ig_publish_failed_{int(asyncio.get_event_loop().time())}.png")
         await page.screenshot(path=screenshot_path, full_page=True)
         logger.error(f"已保存截图: {screenshot_path}")
         raise RuntimeError(f"发布后未找到「查看帖子」链接，可能发布失败。页面截图已保存至: {screenshot_path}")

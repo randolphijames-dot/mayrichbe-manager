@@ -15,6 +15,23 @@ logger = logging.getLogger(__name__)
 _scheduler: BackgroundScheduler | None = None
 
 
+def _write_log(db, task_id: int | None, account_id: int | None, level: str, event: str, message: str, detail: str | None = None):
+    """统一写入发布日志，避免 APScheduler 路径下日志页为空。"""
+    from app.models.log import PublishLog
+
+    db.add(
+        PublishLog(
+            task_id=task_id,
+            account_id=account_id,
+            level=level,
+            event=event,
+            message=message,
+            detail=detail,
+        )
+    )
+    db.commit()
+
+
 def get_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
@@ -125,6 +142,7 @@ def _run_publish_task(task_id: int):
             task.status = TaskStatus.FAILED
             task.error_message = "账号或素材不存在"
             db.commit()
+            _write_log(db, task.id, getattr(task, "account_id", None), "error", "publish_failed", task.error_message)
             return
 
         task.status = TaskStatus.RUNNING
@@ -149,6 +167,7 @@ def _run_publish_task(task_id: int):
             task.status = TaskStatus.FAILED
             task.error_message = str(e)[:500]
             db.commit()
+            _write_log(db, getattr(task, "id", task_id), getattr(task, "account_id", None), "error", "publish_failed", task.error_message, detail=traceback.format_exc())
         except Exception:
             pass
     finally:
@@ -162,6 +181,9 @@ def _publish_instagram(task, account, material, db):
         from app.models.task import TaskStatus
         from app.models.material import MaterialType
         from app.core.encryption import safe_decrypt
+        account_name = getattr(account.browser_type, "value", account.browser_type) or "none"
+
+        _write_log(db, task.id, account.id, "info", "publish_start", f"开始发布 Instagram: {account.username}（方式: {account_name}）")
 
         # 根据账号配置选择发布引擎
         if account.browser_type == BrowserType.NONE or not account.browser_type:
@@ -221,11 +243,14 @@ def _publish_instagram(task, account, material, db):
             task.error_message = None
             db.commit()
 
+        _write_log(db, task.id, account.id, "success", "publish_success", f"Instagram 发布成功: {task.result_url}")
+
     except Exception as e:
         from app.models.task import TaskStatus
         task.status = TaskStatus.FAILED
         task.error_message = str(e)[:500]
         db.commit()
+        _write_log(db, task.id, account.id, "error", "publish_failed", f"Instagram 发布失败: {task.error_message}", detail=str(e))
         raise
 
 
@@ -234,6 +259,7 @@ def _publish_youtube(task, account, material, db):
     try:
         from app.models.task import TaskStatus
         from app.services.youtube_publisher import YouTubePublisher
+        _write_log(db, task.id, account.id, "info", "publish_start", f"开始发布 YouTube: {account.username}")
         pub = YouTubePublisher(account.yt_oauth_token)
         result = pub.upload_video(material)
         account.yt_oauth_token = pub.get_updated_token_json()
@@ -242,11 +268,13 @@ def _publish_youtube(task, account, material, db):
         task.result_url = result.get("url")
         task.error_message = None
         db.commit()
+        _write_log(db, task.id, account.id, "success", "publish_success", f"YouTube 发布成功: {task.result_url}")
     except Exception as e:
         from app.models.task import TaskStatus
         task.status = TaskStatus.FAILED
         task.error_message = str(e)[:500]
         db.commit()
+        _write_log(db, task.id, account.id, "error", "publish_failed", f"YouTube 发布失败: {task.error_message}", detail=str(e))
         raise
 
 
