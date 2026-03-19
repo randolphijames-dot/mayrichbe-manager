@@ -2,8 +2,10 @@
 import asyncio
 import random
 import os
-from typing import Optional
-from playwright.async_api import Page, async_playwright
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
 
 from app.services.adspower import adspower_client
 from app.services.human_behavior import human_type, human_delay, human_move_and_click, random_page_interaction
@@ -37,7 +39,7 @@ class InstagramLoginService:
         self.profile_id = profile_id
         self._browser_info: Optional[dict] = None
 
-    async def check_login_status(self, page: Page) -> str:
+    async def check_login_status(self, page: "Page") -> str:
         """检测当前页面的登录状态"""
         try:
             await page.goto(self.INS_HOME, wait_until="domcontentloaded", timeout=30000)
@@ -77,7 +79,7 @@ class InstagramLoginService:
 
     async def login(
         self,
-        page: Page,
+        page: "Page",
         username: str,
         password: str,
         totp_secret: Optional[str] = None,
@@ -164,7 +166,7 @@ class InstagramLoginService:
 
         return InstagramLoginStatus.LOGGED_IN
 
-    async def _handle_2fa_totp(self, page: Page, totp_secret: str) -> str:
+    async def _handle_2fa_totp(self, page: "Page", totp_secret: str) -> str:
         """处理 TOTP 二步验证（Google Authenticator 类型）"""
         try:
             import pyotp
@@ -190,7 +192,7 @@ class InstagramLoginService:
 
     async def ensure_logged_in(
         self,
-        page: Page,
+        page: "Page",
         username: str,
         password: Optional[str] = None,
         totp_secret: Optional[str] = None,

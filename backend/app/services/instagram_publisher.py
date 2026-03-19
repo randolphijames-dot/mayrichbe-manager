@@ -2,8 +2,7 @@
 import asyncio
 import os
 import tempfile
-from typing import Optional
-from playwright.async_api import async_playwright, Page
+from typing import Optional, TYPE_CHECKING
 
 from app.services.adspower import adspower_client
 from app.services.bitbrowser import bitbrowser_client
@@ -13,6 +12,10 @@ from app.services.human_behavior import (
     human_delay, human_type, random_page_interaction, human_scroll
 )
 from app.models.material import Material, MaterialType
+from app.core.windows_runtime import load_async_playwright
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
 
 
 def _temp_screenshot_path(filename: str) -> str:
@@ -95,6 +98,7 @@ class InstagramPublisher:
         自动判断视频/图片类型。
         返回帖子 URL。
         """
+        async_playwright = load_async_playwright()
         async with async_playwright() as p:
             browser, page = await self._connect_page(p)
             try:
@@ -122,7 +126,7 @@ class InstagramPublisher:
             finally:
                 await browser.close()
 
-    async def _publish_video(self, page: Page, material: Material) -> str:
+    async def _publish_video(self, page: "Page", material: Material) -> str:
         """发布视频 Reels"""
         if not material.file_path or not os.path.exists(material.file_path):
             raise FileNotFoundError(f"视频文件不存在: {material.file_path}")
@@ -181,7 +185,7 @@ class InstagramPublisher:
 
         return await _get_post_url(page, self.username)
 
-    async def _publish_image(self, page: Page, material: Material) -> str:
+    async def _publish_image(self, page: "Page", material: Material) -> str:
         """发布图片帖子"""
         if not material.file_path or not os.path.exists(material.file_path):
             raise FileNotFoundError(f"图片文件不存在: {material.file_path}")
@@ -230,7 +234,7 @@ class InstagramPublisher:
 # 内部辅助函数
 # ──────────────────────────────────────────────
 
-async def _warmup_browse(page: Page):
+async def _warmup_browse(page: "Page"):
     """发布前浏览几秒，让账号行为更自然（优化速度版）"""
     import random
     await page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
@@ -241,13 +245,13 @@ async def _warmup_browse(page: Page):
     await human_delay(500, 1000)  # 缩短等待
 
 
-async def _post_publish_browse(page: Page):
+async def _post_publish_browse(page: "Page"):
     """发布后停留浏览，不立即关闭（优化速度版）"""
     # 只简单等待 1 秒（大幅加快速度）
     await human_delay(1000, 1000)
 
 
-async def _click_create_button(page: Page):
+async def _click_create_button(page: "Page"):
     """点击「创建」按钮（适配中英日文界面）"""
     selectors = [
         'svg[aria-label="新規投稿"]',
@@ -264,14 +268,14 @@ async def _click_create_button(page: Page):
     await page.locator('a[href="/create/style/"]').first.click()
 
 
-async def _upload_file(page: Page, file_path: str):
+async def _upload_file(page: "Page", file_path: str):
     """上传文件到文件输入框"""
     # 等待文件上传对话框或直接输入框
     file_input = page.locator('input[type="file"]').first
     await file_input.set_input_files(file_path)
 
 
-async def _click_next(page: Page):
+async def _click_next(page: "Page"):
     """点击 Next / 次へ 按钮"""
     next_btn = page.locator(
         'button:has-text("次へ"), button:has-text("Next"), [role="button"]:has-text("Next")'
@@ -284,7 +288,7 @@ async def _click_next(page: Page):
         pass
 
 
-async def _fill_caption(page: Page, caption: str):
+async def _fill_caption(page: "Page", caption: str):
     """填写发布文案"""
     caption_area = page.locator(
         '[aria-label="キャプションを入力..."], [aria-label="Write a caption..."], '
@@ -294,7 +298,7 @@ async def _fill_caption(page: Page, caption: str):
         await human_type(page, caption_area, caption[:2200])  # INS 文案上限 2200 字符
 
 
-async def _click_share(page: Page):
+async def _click_share(page: "Page"):
     """直接点击 Share 按钮 - 最简单直接的方式"""
     import logging
     logger = logging.getLogger(__name__)
@@ -330,7 +334,7 @@ async def _click_share(page: Page):
     logger.info("=" * 50)
 
 
-async def _check_publish_errors(page: Page):
+async def _check_publish_errors(page: "Page"):
     """检查发布过程中是否有错误提示"""
     import logging
     logger = logging.getLogger(__name__)
@@ -355,7 +359,7 @@ async def _check_publish_errors(page: Page):
             raise RuntimeError(f"Instagram 发布失败: {error_text}。截图已保存至: {screenshot_path}")
 
 
-async def _get_post_url(page: Page, username: str) -> str:
+async def _get_post_url(page: "Page", username: str) -> str:
     """尝试获取发布成功后的帖子 URL。如果找不到，说明发布失败。"""
     import logging
     logger = logging.getLogger(__name__)

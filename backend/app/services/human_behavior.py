@@ -2,8 +2,10 @@
 import asyncio
 import random
 import math
-from typing import Optional
-from playwright.async_api import Page
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
 
 
 # ──────────────────────────────────────────────
@@ -27,7 +29,7 @@ async def typing_delay():
 # 鼠标行为模拟
 # ──────────────────────────────────────────────
 
-async def human_move_and_click(page: Page, selector: str, timeout: int = 10000):
+async def human_move_and_click(page: "Page", selector: str, timeout: int = 10000):
     """人类鼠标轨迹：先移动到元素附近，再精确点击"""
     element = page.locator(selector).first
     await element.wait_for(timeout=timeout)
@@ -46,7 +48,7 @@ async def human_move_and_click(page: Page, selector: str, timeout: int = 10000):
     await page.mouse.click(target_x, target_y)
 
 
-async def _bezier_mouse_move(page: Page, end_x: float, end_y: float, steps: int = 20):
+async def _bezier_mouse_move(page: "Page", end_x: float, end_y: float, steps: int = 20):
     """贝塞尔曲线鼠标移动，模拟真实手部抖动"""
     # 获取当前鼠标位置（估算起点）
     start_x = end_x + random.uniform(-200, 200)
@@ -72,7 +74,7 @@ async def _bezier_mouse_move(page: Page, end_x: float, end_y: float, steps: int 
 # 打字行为模拟
 # ──────────────────────────────────────────────
 
-async def human_type(page: Page, selector: str, text: str, clear_first: bool = True):
+async def human_type(page: "Page", selector: str, text: str, clear_first: bool = True):
     """模拟人类打字：逐字输入，随机速度，偶尔"出错再纠正"""
     element = page.locator(selector).first
 
@@ -103,7 +105,7 @@ async def human_type(page: Page, selector: str, text: str, clear_first: bool = T
 # 滚动行为模拟
 # ──────────────────────────────────────────────
 
-async def human_scroll(page: Page, direction: str = "down", distance: int = None):
+async def human_scroll(page: "Page", direction: str = "down", distance: int = None):
     """模拟人类滚动页面（分段、变速）"""
     if distance is None:
         distance = random.randint(200, 600)
@@ -117,7 +119,7 @@ async def human_scroll(page: Page, direction: str = "down", distance: int = None
         await asyncio.sleep(random.uniform(0.05, 0.3))
 
 
-async def random_page_interaction(page: Page):
+async def random_page_interaction(page: "Page"):
     """发布前随机浏览，模拟真实用户行为"""
     actions = [
         lambda: human_scroll(page, "down", random.randint(100, 400)),

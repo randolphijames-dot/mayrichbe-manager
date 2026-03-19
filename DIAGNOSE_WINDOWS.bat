@@ -17,7 +17,7 @@ echo 诊断报告 - %date% %time% > "%LOG_FILE%"
 echo ========================================>> "%LOG_FILE%"
 echo.>> "%LOG_FILE%"
 
-echo [1/8] 检查 Python 环境...
+echo [1/10] 检查 Python 环境...
 echo === Python 环境 ===>> "%LOG_FILE%"
 python --version >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
@@ -28,7 +28,7 @@ if errorlevel 1 (
 )
 echo.>> "%LOG_FILE%"
 
-echo [2/8] 检查文件完整性...
+echo [2/10] 检查文件完整性...
 echo === 文件检查 ===>> "%LOG_FILE%"
 if exist "%BACKEND%\app\main.py" (
     echo ✅ 后端文件存在
@@ -47,7 +47,19 @@ if exist "%BACKEND%\static\index.html" (
 )
 echo.>> "%LOG_FILE%"
 
-echo [3/8] 检查端口占用...
+echo [3/10] 检查 Visual C++ Runtime...
+echo === Visual C++ Runtime ===>> "%LOG_FILE%"
+reg query "HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" /v Installed >> "%LOG_FILE%" 2>&1
+if errorlevel 1 (
+    echo ❌ 未检测到 Visual C++ Redistributable (x64)
+    echo [ERROR] Visual C++ Runtime missing>> "%LOG_FILE%"
+    echo [HINT] 安装链接: https://aka.ms/vs/17/release/vc_redist.x64.exe>> "%LOG_FILE%"
+) else (
+    echo ✅ 已检测到 Visual C++ Runtime
+)
+echo.>> "%LOG_FILE%"
+
+echo [4/10] 检查端口占用...
 echo === 端口检查 ===>> "%LOG_FILE%"
 netstat -ano | findstr ":8000" >> "%LOG_FILE%"
 if errorlevel 1 (
@@ -57,7 +69,7 @@ if errorlevel 1 (
 )
 echo.>> "%LOG_FILE%"
 
-echo [4/8] 检查虚拟环境...
+echo [5/10] 检查虚拟环境...
 echo === 虚拟环境 ===>> "%LOG_FILE%"
 if exist "%BACKEND%\.venv\Scripts\python.exe" (
     echo ✅ 虚拟环境已创建
@@ -68,7 +80,7 @@ if exist "%BACKEND%\.venv\Scripts\python.exe" (
 )
 echo.>> "%LOG_FILE%"
 
-echo [5/8] 检查数据库...
+echo [6/10] 检查数据库...
 echo === 数据库检查 ===>> "%LOG_FILE%"
 if exist "%BACKEND%\social_manager.db" (
     echo ✅ 数据库文件存在
@@ -86,7 +98,23 @@ if exist "%BACKEND%\social_manager.db" (
 )
 echo.>> "%LOG_FILE%"
 
-echo [6/8] 检查 BitBrowser / AdsPower...
+echo [7/10] 检查 Playwright / greenlet...
+echo === Playwright Runtime ===>> "%LOG_FILE%"
+if exist "%BACKEND%\.venv\Scripts\python.exe" (
+    "%BACKEND%\.venv\Scripts\python.exe" -c "import greenlet; import playwright.async_api; print('playwright runtime ok')" >> "%LOG_FILE%" 2>&1
+    if errorlevel 1 (
+        echo ❌ Playwright 或 greenlet 运行时异常
+        echo [ERROR] playwright runtime failed>> "%LOG_FILE%"
+    ) else (
+        echo ✅ Playwright / greenlet 正常
+    )
+) else (
+    echo ⚠️  虚拟环境还没创建，暂时无法检查 Playwright 运行时
+    echo [WARN] venv missing, skipped playwright runtime check>> "%LOG_FILE%"
+)
+echo.>> "%LOG_FILE%"
+
+echo [8/10] 检查 BitBrowser / AdsPower...
 echo === 指纹浏览器检查 ===>> "%LOG_FILE%"
 curl -s http://127.0.0.1:54345/api/v1/browser/list >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
@@ -107,7 +135,7 @@ if errorlevel 1 (
 )
 echo.>> "%LOG_FILE%"
 
-echo [7/8] 尝试连接后端 API...
+echo [9/10] 尝试连接后端 API...
 echo === 后端 API 测试 ===>> "%LOG_FILE%"
 curl -s http://127.0.0.1:8000/ >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
@@ -125,7 +153,7 @@ if errorlevel 1 (
 )
 echo.>> "%LOG_FILE%"
 
-echo [8/8] 检查最近的发布任务状态...
+echo [10/10] 检查最近的发布任务状态...
 if exist "%BACKEND%\.venv\Scripts\python.exe" (
     if exist "%BACKEND%\social_manager.db" (
         echo === 最近任务状态 ===>> "%LOG_FILE%"

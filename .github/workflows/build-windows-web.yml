@@ -100,27 +100,35 @@ jobs:
             echo.
             echo set "VENV_PY=%%BACKEND%%\.venv\Scripts\python.exe"
             echo.
-            echo echo [2/5] Installing Python dependencies...
+            echo echo [2/6] Installing Python dependencies...
             echo "%%VENV_PY%%" -m pip install --upgrade pip setuptools wheel ^>nul 2^>^&1
             echo "%%VENV_PY%%" -m pip install -r requirements.txt --timeout 120
             echo if errorlevel 1 goto :END_FAIL
             echo.
-            echo if not exist ".playwright_chromium_ready" ^(
-            echo   echo [3/5] Installing Playwright Chromium...
-            echo   "%%VENV_PY%%" -m playwright install chromium
-            echo   if errorlevel 1 goto :END_FAIL
-            echo   type nul ^> ".playwright_chromium_ready"
+            echo echo [3/6] Checking Playwright runtime...
+            echo "%%VENV_PY%%" -c "import greenlet; import playwright.async_api; print('ok')" ^>nul 2^>^&1
+            echo if errorlevel 1 ^(
+            echo   echo [WARN] Playwright runtime check failed.
+            echo   echo [WARN] Browser publish may fail until Visual C++ runtime is installed.
+            echo   echo [HINT] Install: https://aka.ms/vs/17/release/vc_redist.x64.exe
+            echo ^) else ^(
+            echo   if not exist ".playwright_chromium_ready" ^(
+            echo     echo [4/6] Installing Playwright Chromium...
+            echo     "%%VENV_PY%%" -m playwright install chromium
+            echo     if errorlevel 1 goto :END_FAIL
+            echo     type nul ^> ".playwright_chromium_ready"
+            echo   ^)
             echo ^)
             echo.
             echo if not exist ".env" ^(
             echo   if exist ".env.example" copy ".env.example" ".env" ^>nul
             echo ^)
             echo.
-            echo echo [4/5] Initializing database...
+            echo echo [5/6] Initializing database...
             echo "%%VENV_PY%%" -c "from app.db.init_db import init_db; init_db()"
             echo if errorlevel 1 goto :END_FAIL
             echo.
-            echo echo [5/5] Starting web server...
+            echo echo [6/6] Starting web server...
             echo start "" http://127.0.0.1:8000
             echo echo.
             echo echo URL: http://127.0.0.1:8000
