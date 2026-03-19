@@ -70,6 +70,26 @@ async def upload_material(
     with open(file_path, "wb") as f:
         f.write(content)
 
+    # 生成缩略图
+    thumbnail_path = None
+    if mime_type in ALLOWED_IMAGE_TYPES:
+        # 图片直接使用原文件作为缩略图
+        thumbnail_path = file_path
+    elif mime_type in ALLOWED_VIDEO_TYPES:
+        # 视频提取第一帧作为缩略图
+        try:
+            import subprocess
+            thumb_filename = f"thumb_{safe_filename}.jpg"
+            thumb_path = os.path.join(upload_dir, thumb_filename)
+            subprocess.run([
+                'ffmpeg', '-i', file_path, '-vframes', '1',
+                '-vf', 'scale=480:-1', '-q:v', '2', thumb_path
+            ], check=True, capture_output=True, timeout=10)
+            thumbnail_path = thumb_path
+        except Exception as e:
+            # 缩略图生成失败不影响上传，只记录警告
+            print(f"[WARN] 缩略图生成失败: {e}")
+
     # 解析账号 ID 列表
     account_ids = []
     if target_account_ids:
@@ -92,6 +112,7 @@ async def upload_material(
         file_path=file_path,
         file_size=len(content),
         mime_type=mime_type,
+        thumbnail_path=thumbnail_path,
         caption=caption,
         yt_title=yt_title,
         yt_tags=yt_tags,

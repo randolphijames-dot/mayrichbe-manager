@@ -170,7 +170,27 @@ jobs:
             echo - Initialize database
             echo - Start web server
             echo.
+            echo ## Troubleshooting
+            echo.
+            echo ### "DLL load failed" Error
+            echo.
+            echo If you see "ImportError: DLL load failed while importing _greenlet":
+            echo.
+            echo 1. Download Visual C++ Redistributable:
+            echo    https://aka.ms/vs/17/release/vc_redist.x64.exe
+            echo 2. Install it
+            echo 3. Restart START_WINDOWS.bat
+            echo.
+            echo ### Other Issues
+            echo.
+            echo Run DIAGNOSE_WINDOWS.bat to generate diagnostic report.
+            echo.
           ) > dist-web-windows\Mayrichbe-Manager-Web\README.txt
+
+      - name: Copy diagnostic tool
+        shell: cmd
+        run: |
+          copy DIAGNOSE_WINDOWS.bat dist-web-windows\Mayrichbe-Manager-Web\
 
       - name: Copy backend files
         shell: cmd
