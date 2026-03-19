@@ -177,7 +177,7 @@ jobs:
           )
 
           :OPEN_BROWSER
-          start "" cmd /c "timeout /t 2 /nobreak >nul && start http://127.0.0.1:8000"
+          start "" "http://127.0.0.1:8000"
           echo.
           echo URL: http://127.0.0.1:8000
           echo Log: %LOG_FILE%
