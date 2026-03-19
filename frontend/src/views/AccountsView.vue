@@ -111,7 +111,7 @@
       <div v-else-if="filteredAccounts.length === 0" class="empty-state" style="padding:60px">
         <Users :size="32" />
         <p>暂无账号，点击「新增账号」或「批量导入 CSV」开始</p>
-        <a href="/账号导入模板.csv" download class="btn btn-ghost btn-sm mt-2">下载 CSV 模板</a>
+        <a href="/ACCOUNT_IMPORT_TEMPLATE.csv" download class="btn btn-ghost btn-sm mt-2">下载 CSV 模板</a>
       </div>
       <table v-else class="table">
         <thead>

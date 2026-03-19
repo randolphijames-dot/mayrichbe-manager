@@ -101,7 +101,7 @@
             </tbody>
           </table>
         </div>
-        <a href="/账号导入模版.csv" download class="btn btn-primary btn-sm mt-3">
+        <a href="/ACCOUNT_IMPORT_TEMPLATE.csv" download class="btn btn-primary btn-sm mt-3">
           <Download :size="12" /> 下载 CSV 模版
         </a>
       </div>

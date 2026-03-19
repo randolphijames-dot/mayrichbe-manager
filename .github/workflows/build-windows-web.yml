@@ -191,6 +191,7 @@ jobs:
         shell: cmd
         run: |
           copy DIAGNOSE_WINDOWS.bat dist-web-windows\Mayrichbe-Manager-Web\
+          copy ACCOUNT_IMPORT_TEMPLATE.csv dist-web-windows\Mayrichbe-Manager-Web\ACCOUNT_IMPORT_TEMPLATE.csv
 
       - name: Copy backend files
         shell: cmd
@@ -199,12 +200,14 @@ jobs:
           rmdir /S /Q dist-web-windows\Mayrichbe-Manager-Web\backend\.venv 2>nul
           rmdir /S /Q dist-web-windows\Mayrichbe-Manager-Web\backend\__pycache__ 2>nul
           del /Q dist-web-windows\Mayrichbe-Manager-Web\backend\social_manager.db 2>nul
+          del /Q dist-web-windows\Mayrichbe-Manager-Web\backend\账号导入模板.csv 2>nul
+          del /Q dist-web-windows\Mayrichbe-Manager-Web\backend\static\账号导入模版.csv 2>nul
           mkdir dist-web-windows\Mayrichbe-Manager-Web\backend\uploads 2>nul
 
       - name: Create ZIP
         shell: pwsh
         run: |
-          Compress-Archive -Path "dist-web-windows\Mayrichbe-Manager-Web\*" -DestinationPath "dist-web-windows\Mayrichbe-Manager-Web.zip" -Force
+          Compress-Archive -Path "dist-web-windows\Mayrichbe-Manager-Web" -DestinationPath "dist-web-windows\Mayrichbe-Manager-Web.zip" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
