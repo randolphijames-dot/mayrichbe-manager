@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 400px; height: 300px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: -apple-system, 'Hiragino Sans', sans-serif;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin-bottom: 20px;
+      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+    }
+    h1 { color: #f1f5f9; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    p  { color: #64748b; font-size: 13px; margin-bottom: 32px; }
+    .bar {
+      width: 200px; height: 3px;
+      background: #1e293b; border-radius: 2px; overflow: hidden;
+    }
+    .bar-inner {
+      height: 100%; width: 0%; background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      border-radius: 2px; animation: progress 3s ease forwards;
+    }
+    .tip { color: #475569; font-size: 11px; margin-top: 12px; }
+    @keyframes progress { to { width: 90%; } }
+  </style>
+</head>
+<body>
+  <div class="logo">⚡</div>
+  <h1>Mayrichbe Manager</h1>
+  <p>INS / YouTube 多账号批量管理</p>
+  <div class="bar"><div class="bar-inner"></div></div>
+  <div class="tip">正在启动后台服务…</div>
+</body>
+</html>

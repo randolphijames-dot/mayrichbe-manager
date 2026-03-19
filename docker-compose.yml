@@ -1,0 +1,26 @@
+version: "3.9"
+
+# 注意：
+# 1. AdsPower 需要在本地 Mac 单独安装运行（不在 Docker 内）
+# 2. AdsPower 默认监听 http://local.adspower.net:50325
+# 3. 使用 APScheduler 进行任务调度（无需 Redis/Celery）
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/social_manager.db:/app/social_manager.db
+    environment:
+      - DATABASE_URL=sqlite:///./social_manager.db
+      # AdsPower 运行在宿主机，使用 host.docker.internal 访问
+      - ADSPOWER_API_URL=http://host.docker.internal:50325
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

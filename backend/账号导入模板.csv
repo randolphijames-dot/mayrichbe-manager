@@ -1,0 +1,4 @@
+name,username,platform,group_name,browser_type,browser_profile_id,proxy,ins_password,ins_totp_secret,notes
+日本財経_01,japan_finance_01,instagram,财经类,bitbrowser,12345678,http://user:pass@ip:port,mypassword123,,第一个测试账号
+生活分享_01,life_share_01,instagram,生活类,adspower,abcd1234,,,JBSWY3DPEHPK3PXP,带2FA的账号
+YouTube频道_01,my_channel,youtube,YouTube组,none,,socks5://proxy:port,,,YouTube OAuth账号

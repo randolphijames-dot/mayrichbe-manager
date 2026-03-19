@@ -1,0 +1,149 @@
+name: Build Windows (Verified)
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            frontend/package-lock.json
+            electron/package-lock.json
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+        env:
+          CI: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Build Python backend (PyInstaller)
+        shell: cmd
+        run: |
+          cd backend
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --upgrade pip setuptools wheel
+          .venv\Scripts\python -m pip install -r requirements.txt
+          .venv\Scripts\python -m pip install pyinstaller
+          .venv\Scripts\pyinstaller backend_win.spec --noconfirm --clean
+          copy dist\backend_win.exe backend_win.exe
+          if not exist backend_win.exe (
+            echo backend_win.exe not found after build
+            exit /b 1
+          )
+
+      - name: Build Electron package (Windows)
+        shell: cmd
+        run: |
+          cd electron
+          call npm ci
+          call npm run build:win -- --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate Windows package outputs
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Recurse -Filter "*.exe" |
+            Where-Object { $_.FullName -notmatch '\\node_modules\\' } |
+            Sort-Object FullName |
+            ForEach-Object { Write-Host $_.FullName }
+
+      - name: Smoke test portable EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $backendLog = Join-Path $env:APPDATA "mayrichbe-manager\backend.log"
+
+          $portable = Get-ChildItem -Path . -Recurse -Filter "*.exe" |
+            Where-Object {
+              $_.FullName -notmatch '\\node_modules\\' -and
+              $_.Name -match '^Mayrichbe Manager.*\.exe$' -and
+              $_.Name -notmatch 'Setup'
+            } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $portable) {
+            throw "Portable EXE not found after build"
+          }
+
+          Write-Host "Portable EXE: $($portable.FullName)"
+          $appProcess = Start-Process -FilePath $portable.FullName -PassThru
+
+          try {
+            # CI 上首次启动可能较慢（便携版解压 + Defender 扫描）
+            $deadline = (Get-Date).AddMinutes(8)
+            $healthy = $false
+            while ((Get-Date) -lt $deadline) {
+              if ($appProcess -and $appProcess.HasExited) {
+                throw "App process exited early with code $($appProcess.ExitCode)"
+              }
+              try {
+                $healthResp = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 3
+                if ($healthResp.status -eq "ok") {
+                  $healthy = $true
+                  break
+                }
+              }
+              catch {
+                Start-Sleep -Seconds 2
+              }
+            }
+
+            if (-not $healthy) {
+              throw "Health check failed: backend not ready within 8 minutes"
+            }
+
+            $index = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -TimeoutSec 5 -UseBasicParsing
+            if ($index.StatusCode -ne 200) {
+              throw "Index check failed: status code $($index.StatusCode)"
+            }
+
+            if ($index.Content -notmatch '<!doctype html' -and $index.Content -notmatch '<html') {
+              throw "Index check failed: unexpected content"
+            }
+
+            Write-Host "Smoke test passed"
+          }
+          finally {
+            if (Test-Path $backendLog) {
+              Write-Host "===== backend.log (tail 200) ====="
+              Get-Content $backendLog -Tail 200
+            } else {
+              Write-Host "backend.log not found at: $backendLog"
+            }
+            if ($appProcess -and -not $appProcess.HasExited) {
+              Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+            Get-Process backend_win -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload verified Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayrichbe-manager-windows-verified
+          path: |
+            **/dist-electron/*.exe
+            **/dist-electron/*.blockmap

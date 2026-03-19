@@ -1,0 +1,418 @@
+name: Build Windows Web Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-web:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        shell: cmd
+        run: |
+          cd frontend
+          npm ci
+          if errorlevel 1 exit /b 1
+
+      - name: Build frontend
+        shell: cmd
+        run: |
+          cd frontend
+          npm run build
+          if errorlevel 1 exit /b 1
+
+      - name: Verify frontend build output
+        shell: cmd
+        run: |
+          if not exist "backend\static\index.html" (
+            echo [ERROR] Frontend build failed - index.html not found
+            dir backend
+            exit /b 1
+          )
+          echo [OK] Frontend static files ready
+          dir backend\static
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create Windows launcher files
+        shell: pwsh
+        run: |
+          $bundle = "dist-web-windows/Mayrichbe-Manager-Web"
+          New-Item -ItemType Directory -Force -Path $bundle | Out-Null
+
+          $start = @'
+          @echo off
+          setlocal EnableExtensions EnableDelayedExpansion
+
+          if /I not "%~1"=="__RUN_IN_CMD" (
+            start "" cmd /k "\"%~f0\" __RUN_IN_CMD"
+            exit /b 0
+          )
+          shift
+
+          set "ROOT=%~dp0"
+          cd /d "%ROOT%"
+
+          set "BACKEND=%ROOT%backend"
+          set "LOG_DIR=%ROOT%logs"
+          if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+          set "LOG_FILE=%LOG_DIR%\start_windows.log"
+
+          echo ==================================================>>"%LOG_FILE%"
+          echo [%%date%% %%time%%] START>>"%LOG_FILE%"
+          echo ROOT=%ROOT%>>"%LOG_FILE%"
+
+          echo.
+          echo ========================================
+          echo   Mayrichbe Manager - Windows Web Mode
+          echo ========================================
+          echo.
+
+          if not exist "%BACKEND%\app\main.py" (
+            echo [ERROR] backend folder not found.
+            echo [ERROR] See log: %LOG_FILE%
+            goto :END_FAIL
+          )
+
+          if not exist "%BACKEND%\static\index.html" (
+            echo [ERROR] frontend static file missing: backend\static\index.html
+            echo [ERROR] See log: %LOG_FILE%
+            goto :END_FAIL
+          )
+
+          call :DETECT_PYTHON
+          if errorlevel 1 goto :END_FAIL
+
+          echo [ENV] Python launcher: %PY_CMD%
+          echo [ENV] Python launcher: %PY_CMD%>>"%LOG_FILE%"
+
+          cd /d "%BACKEND%"
+
+          if not exist ".venv\Scripts\python.exe" (
+            echo [1/6] Creating virtual environment...
+            %PY_CMD% -m venv .venv >>"%LOG_FILE%" 2>&1
+            if errorlevel 1 (
+              echo [ERROR] Failed to create virtual environment.
+              echo [ERROR] See log: %LOG_FILE%
+              goto :END_FAIL
+            )
+          )
+
+          set "VENV_PY=%BACKEND%\.venv\Scripts\python.exe"
+
+          echo [2/6] Installing Python dependencies...
+          "%VENV_PY%" -m pip install --upgrade pip setuptools wheel >>"%LOG_FILE%" 2>&1
+          "%VENV_PY%" -m pip install -r requirements.txt --timeout 180 --prefer-binary >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            echo [WARN] First dependency install failed, retrying...
+            "%VENV_PY%" -m pip install -r requirements.txt --timeout 240 >>"%LOG_FILE%" 2>&1
+          )
+          if errorlevel 1 (
+            echo [ERROR] Dependency install failed.
+            echo [ERROR] See log: %LOG_FILE%
+            echo [HINT] Run DIAGNOSE_WINDOWS.bat for diagnostics.
+            goto :END_FAIL
+          )
+
+          set "PLAYWRIGHT_RUNTIME_OK=1"
+          echo [3/6] Checking Playwright runtime...
+          "%VENV_PY%" -c "from app.core.windows_runtime import check_playwright_runtime; ok, msg = check_playwright_runtime(); print(msg); raise SystemExit(0 if ok else 1)" >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            set "PLAYWRIGHT_RUNTIME_OK="
+            echo [WARN] Playwright runtime check failed.
+            echo [WARN] Instagram browser publish may fail until Visual C++ runtime is installed.
+            echo [HINT] Install: https://aka.ms/vs/17/release/vc_redist.x64.exe
+            echo [HINT] Run DIAGNOSE_WINDOWS.bat after installation.
+          )
+
+          if defined PLAYWRIGHT_RUNTIME_OK (
+            if not exist ".playwright_chromium_ready" (
+              echo [4/6] Installing Playwright Chromium...
+              "%VENV_PY%" -m playwright install chromium >>"%LOG_FILE%" 2>&1
+              if errorlevel 1 (
+                echo [WARN] Playwright Chromium install failed. Core web app can still start.
+                echo [WARN] Playwright Chromium install failed.>>"%LOG_FILE%"
+              ) else (
+                type nul > ".playwright_chromium_ready"
+              )
+            )
+          ) else (
+            echo [4/6] Skipping Playwright Chromium install because runtime check failed.
+          )
+
+          if not exist ".env" (
+            if exist ".env.example" (
+              copy ".env.example" ".env" >nul
+              echo [INFO] Created backend\.env from template.
+              echo [INFO] Created backend\.env from template.>>"%LOG_FILE%"
+            )
+          )
+
+          echo [5/6] Initializing database...
+          "%VENV_PY%" -c "from app.db.init_db import init_db; init_db(); print('ok')" >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            echo [ERROR] Database initialization failed.
+            echo [ERROR] See log: %LOG_FILE%
+            goto :END_FAIL
+          )
+
+          echo [6/6] Starting web server...
+          for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:":8000 .*LISTENING"') do (
+            echo [WARN] Port 8000 is already in use (PID: %%p).
+            echo [WARN] Port 8000 already in use, PID=%%p>>"%LOG_FILE%"
+            goto :OPEN_BROWSER
+          )
+
+          :OPEN_BROWSER
+          start "" cmd /c "timeout /t 2 /nobreak >nul && start http://127.0.0.1:8000"
+          echo.
+          echo URL: http://127.0.0.1:8000
+          echo Log: %LOG_FILE%
+          if not defined PLAYWRIGHT_RUNTIME_OK (
+            echo.
+            echo [WARN] Browser-mode Instagram publish is currently unavailable.
+            echo [HINT] Install Visual C++ Redistributable (x64) and restart:
+            echo        https://aka.ms/vs/17/release/vc_redist.x64.exe
+          )
+          echo Keep this window open while app is running.
+          echo.
+          "%VENV_PY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 >>"%LOG_FILE%" 2>&1
+          echo.
+          echo [INFO] Server stopped. Log: %LOG_FILE%
+          goto :EOF
+
+          :DETECT_PYTHON
+          set "PY_CMD="
+
+          for %%V in (3.12 3.11 3.10) do (
+            py -%%V -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+            if not errorlevel 1 (
+              set "PY_CMD=py -%%V"
+              goto :EOF
+            )
+          )
+
+          python -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+          if not errorlevel 1 (
+            set "PY_CMD=python"
+            goto :EOF
+          )
+
+          echo [ERROR] Python 3.10+ not found.
+          echo [ERROR] Python 3.10+ not found.>>"%LOG_FILE%"
+          exit /b 1
+
+          :END_FAIL
+          echo.
+          echo Startup failed.
+          echo Please run DIAGNOSE_WINDOWS.bat and send this log:
+          echo   %LOG_FILE%
+          echo.
+          pause
+          exit /b 1
+          '@
+          Set-Content -Path "$bundle/START_WINDOWS.bat" -Value $start -Encoding ascii
+
+          $diagnose = @'
+          @echo off
+          setlocal EnableExtensions
+
+          if /I not "%~1"=="__RUN_IN_CMD" (
+            start "" cmd /k "\"%~f0\" __RUN_IN_CMD"
+            exit /b 0
+          )
+          shift
+
+          set "ROOT=%~dp0"
+          cd /d "%ROOT%"
+          set "BACKEND=%ROOT%backend"
+          set "LOG_DIR=%ROOT%logs"
+          if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+          set "LOG_FILE=%LOG_DIR%\diagnose_windows.log"
+
+          echo ==================================================>>"%LOG_FILE%"
+          echo [%%date%% %%time%%] DIAGNOSE>>"%LOG_FILE%"
+
+          echo.
+          echo ========================================
+          echo   Mayrichbe Manager - Diagnostics
+          echo ========================================
+          echo.
+
+          echo [1/8] Checking backend files...
+          if exist "%BACKEND%\app\main.py" (
+            echo [ OK ] backend folder found.
+          ) else (
+            echo [FAIL] backend folder missing.
+            echo [FAIL] backend folder missing.>>"%LOG_FILE%"
+          )
+
+          if exist "%BACKEND%\static\index.html" (
+            echo [ OK ] frontend static file found.
+          ) else (
+            echo [FAIL] frontend static file missing.
+            echo [FAIL] frontend static file missing.>>"%LOG_FILE%"
+          )
+
+          echo [2/8] Checking Python...
+          set "PY_OK="
+          for %%V in (3.12 3.11 3.10) do (
+            py -%%V -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+            if not errorlevel 1 (
+              echo [ OK ] Python available via py -%%V
+              set "PY_OK=1"
+              goto :AFTER_PY
+            )
+          )
+          python -c "import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+          if not errorlevel 1 (
+            echo [ OK ] Python available via python
+            set "PY_OK=1"
+            goto :AFTER_PY
+          )
+          echo [FAIL] Python 3.10+ not found.
+          echo [FAIL] Python 3.10+ not found.>>"%LOG_FILE%"
+
+          :AFTER_PY
+          echo [3/8] Checking Visual C++ runtime...
+          if exist "%WINDIR%\System32\vcruntime140.dll" (
+            echo [ OK ] vcruntime140.dll exists.
+          ) else (
+            echo [FAIL] vcruntime140.dll missing.
+            echo [HINT] Install https://aka.ms/vs/17/release/vc_redist.x64.exe
+            echo [FAIL] vcruntime140.dll missing.>>"%LOG_FILE%"
+          )
+
+          echo [4/8] Checking virtual environment...
+          if exist "%BACKEND%\.venv\Scripts\python.exe" (
+            echo [ OK ] virtual environment exists.
+          ) else (
+            echo [WARN] virtual environment missing.
+          )
+
+          echo [5/8] Checking Playwright runtime...
+          if exist "%BACKEND%\.venv\Scripts\python.exe" (
+            "%BACKEND%\.venv\Scripts\python.exe" -c "from app.core.windows_runtime import check_playwright_runtime; ok, msg = check_playwright_runtime(); print(msg); raise SystemExit(0 if ok else 1)" >>"%LOG_FILE%" 2>&1
+            if errorlevel 1 (
+              echo [FAIL] Playwright runtime import failed.
+              echo [HINT] Install https://aka.ms/vs/17/release/vc_redist.x64.exe
+            ) else (
+              echo [ OK ] Playwright runtime check passed.
+            )
+          ) else (
+            echo [WARN] Skipping Playwright runtime check because venv is missing.
+          )
+
+          echo [6/8] Checking BitBrowser / AdsPower...
+          curl -s http://127.0.0.1:54345/api/v1/browser/list >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            echo [WARN] BitBrowser not reachable.
+          ) else (
+            echo [ OK ] BitBrowser reachable.
+          )
+          curl -s http://127.0.0.1:50325/api/v1/browser/list >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            echo [WARN] AdsPower not reachable.
+          ) else (
+            echo [ OK ] AdsPower reachable.
+          )
+
+          echo [7/8] Checking API endpoint...
+          curl -s http://127.0.0.1:8000/ >>"%LOG_FILE%" 2>&1
+          if errorlevel 1 (
+            echo [WARN] Backend API is not responding.
+          ) else (
+            echo [ OK ] Backend API is responding.
+          )
+
+          echo [8/8] Checking port 8000...
+          for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:":8000 .*LISTENING"') do (
+            echo [WARN] Port 8000 already in use (PID: %%p).
+            goto :END
+          )
+          echo [ OK ] Port 8000 is free.
+
+          :END
+          echo.
+          echo Diagnostics finished.
+          echo Log file: %LOG_FILE%
+          echo If Playwright failed, install:
+          echo   https://aka.ms/vs/17/release/vc_redist.x64.exe
+          echo.
+          pause
+          '@
+          Set-Content -Path "$bundle/DIAGNOSE_WINDOWS.bat" -Value $diagnose -Encoding ascii
+
+          $readme = @'
+          Mayrichbe Manager - Windows Web Version
+
+          Quick Start
+          1. Install Python 3.11+ and check "Add Python to PATH".
+          2. Extract to a path without spaces, for example C:\Mayrichbe.
+          3. Double-click START_WINDOWS.bat.
+          4. Open http://127.0.0.1:8000 in the browser.
+
+          Diagnostics
+          If startup fails, double-click DIAGNOSE_WINDOWS.bat.
+          If Playwright fails, install:
+          https://aka.ms/vs/17/release/vc_redist.x64.exe
+          '@
+          Set-Content -Path "$bundle/README.txt" -Value $readme -Encoding ascii
+
+          Copy-Item "ACCOUNT_IMPORT_TEMPLATE.csv" "$bundle/ACCOUNT_IMPORT_TEMPLATE.csv"
+
+      - name: Copy backend files
+        shell: pwsh
+        run: |
+          $bundle = "dist-web-windows/Mayrichbe-Manager-Web/backend"
+          Copy-Item backend $bundle -Recurse -Force
+
+          $removePaths = @(
+            "$bundle/.venv",
+            "$bundle/venv",
+            "$bundle/__pycache__",
+            "$bundle/build",
+            "$bundle/debug_screens",
+            "$bundle/dist-windows-github",
+            "$bundle/instagrapi_sessions",
+            "$bundle/social_manager.db",
+            "$bundle/.env",
+            "$bundle/backend_mac",
+            "$bundle/debug_ig_login.py",
+            "$bundle/static/账号导入模版.csv",
+            "$bundle/账号导入模板.csv"
+          )
+
+          foreach ($path in $removePaths) {
+            if (Test-Path $path) {
+              Remove-Item -Path $path -Recurse -Force
+            }
+          }
+
+          Get-ChildItem -Path $bundle -Recurse -Include __pycache__,*.pyc | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "$bundle/uploads" | Out-Null
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist-web-windows\Mayrichbe-Manager-Web\*" -DestinationPath "dist-web-windows\Mayrichbe-Manager-Web.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayrichbe-manager-windows-web
+          path: dist-web-windows/Mayrichbe-Manager-Web.zip
+          retention-days: 7
