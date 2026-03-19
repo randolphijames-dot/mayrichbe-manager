@@ -252,26 +252,93 @@ async def _post_publish_browse(page: "Page"):
 
 
 async def _click_create_button(page: "Page"):
-    """点击「创建」按钮（适配中英日文界面）"""
-    selectors = [
-        'svg[aria-label="新規投稿"]',
-        'svg[aria-label="New post"]',
+    """点击「创建」按钮（适配不同语言、布局和新版 IG 路由）"""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        await page.goto("https://www.instagram.com/", wait_until="domcontentloaded", timeout=30000)
+    except Exception as exc:
+        logger.info("回到 Instagram 首页时出现异常，继续尝试当前页查找创建入口: %s", exc)
+
+    candidate_selectors = [
+        '[aria-label="New post"]',
         '[aria-label="Create"]',
-        '[data-bloks-name="bk.components.Flexbox"] svg',
+        '[aria-label="Create new post"]',
+        '[aria-label="新規投稿"]',
+        '[aria-label="作成"]',
+        '[aria-label="创建"]',
+        'a[href="/create/select/"]',
+        'a[href="/create/style/"]',
+        'a[href*="/create/"]',
+        'svg[aria-label="New post"]',
+        'svg[aria-label="新規投稿"]',
     ]
-    for sel in selectors:
-        btn = page.locator(sel).first
-        if await btn.is_visible(timeout=3000):
-            await btn.click()
-            return
-    # fallback：找包含 "+" 的导航按钮
-    await page.locator('a[href="/create/style/"]').first.click()
+
+    for sel in candidate_selectors:
+        try:
+            btn = page.locator(sel).first
+            if await btn.is_visible(timeout=2500):
+                await human_delay(200, 600)
+                await btn.click(force=True)
+                return
+        except Exception:
+            pass
+
+    text_candidates = [
+        "Create",
+        "New post",
+        "Create new post",
+        "Post",
+        "作成",
+        "新規投稿",
+        "创建",
+        "发帖",
+    ]
+    for text in text_candidates:
+        try:
+            btn = page.get_by_role("link", name=text).first
+            if await btn.is_visible(timeout=1500):
+                await btn.click(force=True)
+                return
+        except Exception:
+            pass
+        try:
+            btn = page.get_by_role("button", name=text).first
+            if await btn.is_visible(timeout=1500):
+                await btn.click(force=True)
+                return
+        except Exception:
+            pass
+
+    create_urls = [
+        "https://www.instagram.com/create/select/",
+        "https://www.instagram.com/create/style/",
+    ]
+    for url in create_urls:
+        try:
+            logger.info("未找到创建按钮，尝试直接进入创建页: %s", url)
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            file_input = page.locator('input[type="file"]').first
+            if await file_input.count() > 0:
+                return
+        except Exception:
+            pass
+
+    screenshot_path = _temp_screenshot_path(f"ig_create_button_missing_{int(asyncio.get_event_loop().time())}.png")
+    await page.screenshot(path=screenshot_path, full_page=True)
+    raise RuntimeError(
+        f"未找到 Instagram 创建入口。当前页面标题: {(await page.title())!r}，URL: {page.url}。"
+        f" 页面截图已保存至: {screenshot_path}"
+    )
 
 
 async def _upload_file(page: "Page", file_path: str):
     """上传文件到文件输入框"""
     # 等待文件上传对话框或直接输入框
     file_input = page.locator('input[type="file"]').first
+    await file_input.wait_for(state="attached", timeout=15000)
     await file_input.set_input_files(file_path)
 
 
