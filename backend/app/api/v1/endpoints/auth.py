@@ -53,10 +53,6 @@ def verify_request_token(token: str) -> Optional[dict]:
     if payload and "user_id" in payload:
         return payload
 
-    # 向后兼容：原始密码直接匹配（未迁移的旧 token）
-    if settings.ACCESS_PASSWORD and token == settings.ACCESS_PASSWORD:
-        return {"user_id": 0, "username": "legacy", "is_admin": True}
-
     return None
 
 
