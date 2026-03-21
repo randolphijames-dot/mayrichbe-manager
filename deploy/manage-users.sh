@@ -188,7 +188,7 @@ PYEOF
     echo "================================================"
     info "User '$USERNAME' created successfully!"
     echo ""
-    echo "  URL:      https://${USERNAME}.sm.example.com"
+    echo "  URL:      https://${USERNAME}.sm.mayrichbe.cam"
     echo "  Password: $ACCESS_PASS"
     echo ""
     echo "  IMPORTANT: Save the password above!"

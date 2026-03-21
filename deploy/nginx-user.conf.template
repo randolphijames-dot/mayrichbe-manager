@@ -7,11 +7,11 @@
 server {
     listen 443 ssl;
     http2 on;
-    server_name __USERNAME__.sm.example.com;
+    server_name __USERNAME__.sm.mayrichbe.cam;
 
     # SSL 证书（通配符证书，所有子域名共用）
-    ssl_certificate     /etc/letsencrypt/live/sm.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/sm.example.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/sm.mayrichbe.cam/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/sm.mayrichbe.cam/privkey.pem;
 
     # SSL 安全设置
     ssl_protocols TLSv1.2 TLSv1.3;

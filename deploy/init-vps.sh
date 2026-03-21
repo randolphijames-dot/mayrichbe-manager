@@ -12,15 +12,15 @@
 #    - Ubuntu 22.04 or newer
 #    - Root or sudo access
 #    - Domain pointed to this VPS IP (DNS A record)
-#      e.g. *.sm.example.com → VPS_IP
-#           sm.example.com   → VPS_IP
+#      e.g. *.sm.mayrichbe.cam → VPS_IP
+#           sm.mayrichbe.cam   → VPS_IP
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set -e
 
 # ─── Configuration ───
-DOMAIN="${SM_DOMAIN:-sm.example.com}"
-GIT_REPO="${SM_GIT_REPO:-https://github.com/YOUR_USERNAME/social-manager.git}"
+DOMAIN="${SM_DOMAIN:-sm.mayrichbe.cam}"
+GIT_REPO="${SM_GIT_REPO:-https://github.com/randolphijames-dot/mayrichbe-manager.git}"
 INSTALL_DIR="/opt/social-manager"
 
 echo "================================================"
@@ -168,7 +168,7 @@ echo "  1. Configure DNS (A records for ${DOMAIN} and *.${DOMAIN})"
 echo "  2. Request SSL certificate (see Step 9 output above)"
 echo "  3. Update domain in Nginx config:"
 echo "     - Edit $INSTALL_DIR/deploy/nginx-multi.conf"
-echo "     - Replace 'sm.example.com' with '${DOMAIN}'"
+echo "     - Replace 'sm.mayrichbe.cam' with '${DOMAIN}'"
 echo "  4. Copy .env.multi.example to .env.multi and configure"
 echo "  5. Add your first user:"
 echo "     cd $INSTALL_DIR/deploy"
