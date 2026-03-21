@@ -1,27 +1,48 @@
-# 使用Python 3.12官方镜像
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Stage 1: Build frontend (Vue + Vite)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FROM node:20-slim AS frontend-build
+
+WORKDIR /build
+
+# Copy frontend package files first (for better Docker cache)
+COPY frontend/package.json frontend/package-lock.json* ./
+
+# Install dependencies
+RUN npm install
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build → outputs to ../backend/static, but in build context we override
+RUN npx vite build --outDir /build/static
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Stage 2: Backend + built frontend
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FROM python:3.12-slim
 
-# 安装系统依赖
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 设置工作目录
 WORKDIR /app
 
-# 复制backend文件
+# Copy backend files
 COPY backend/ /app/
 
-# 安装Python依赖
+# Copy built frontend static files from stage 1
+COPY --from=frontend-build /build/static /app/static/
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装Playwright浏览器
+# Install Playwright browser
 RUN playwright install chromium
 RUN playwright install-deps chromium
 
-# 暴露端口
 EXPOSE 8000
 
-# 启动命令
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
