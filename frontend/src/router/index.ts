@@ -5,6 +5,8 @@ const router = createRouter({
   routes: [
     { path: '/', component: () => import('@/views/DashboardView.vue') },
     { path: '/accounts', component: () => import('@/views/AccountsView.vue') },
+    { path: '/monitor', component: () => import('@/views/AccountsMonitorView.vue') },
+    { path: '/publish-status', component: () => import('@/views/PublishStatusView.vue') },
     { path: '/materials', component: () => import('@/views/MaterialsView.vue') },
     { path: '/schedule', component: () => import('@/views/ScheduleView.vue') },
     { path: '/calendar', component: () => import('@/views/CalendarView.vue') },

@@ -502,8 +502,21 @@ async function confirmDelete() {
 }
 async function handleCheckStatus(record: any) {
   checkingId.value = record.id
-  try { await accountsApi.checkStatus(record.id); showToast('健康检测已触发，稍后刷新查看') }
-  finally { checkingId.value = null }
+  try {
+    const result = await accountsApi.checkStatus(record.id) as any
+    if (result.status === 'active') {
+      showToast(`✅ ${record.username} 登录正常`)
+    } else if (result.status === 'suspended') {
+      showToast(`❌ ${record.username} 登录失败，请检查密码或代理`, 'error')
+    } else {
+      showToast(`${record.username} 未配置密码，无法检测`)
+    }
+    await loadAccounts()
+  } catch {
+    // 错误已由全局拦截器统一处理
+  } finally {
+    checkingId.value = null
+  }
 }
 async function handleYtOAuth(record: any) {
   const res = await youtubeApi.startOAuth(record.id) as any

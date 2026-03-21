@@ -26,7 +26,7 @@ def list_tasks(
         q = q.filter(PublishTask.account_id == account_id)
     if status:
         q = q.filter(PublishTask.status == status)
-    return q.order_by(PublishTask.scheduled_at.asc()).offset(skip).limit(limit).all()
+    return q.order_by(PublishTask.scheduled_at.desc()).offset(skip).limit(limit).all()
 
 
 @router.post("/", response_model=TaskOut, status_code=status.HTTP_201_CREATED)

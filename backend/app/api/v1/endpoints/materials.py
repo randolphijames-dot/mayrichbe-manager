@@ -88,6 +88,14 @@ async def upload_material(
     if mime_type not in allowed:
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {mime_type}")
 
+    # 自动修正素材类型（根据 MIME 判断，不信任前端传入的类型）
+    if mime_type in ALLOWED_IMAGE_TYPES:
+        material_type = MaterialType.IMAGE
+    elif mime_type in ALLOWED_VIDEO_TYPES:
+        material_type = MaterialType.VIDEO
+    else:
+        raise HTTPException(status_code=400, detail=f"无法识别文件类型: {mime_type}")
+
     # 保存文件
     upload_dir = os.path.abspath(settings.UPLOAD_DIR)
     os.makedirs(upload_dir, exist_ok=True)
@@ -194,16 +202,34 @@ def update_material(material_id: int, payload: MaterialUpdate, db: Session = Dep
 @router.delete("/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_material(material_id: int, db: Session = Depends(get_db)):
     """删除素材（同时删除本地文件）"""
+    from app.models.task import PublishTask
+
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="素材不存在")
 
-    # 删除物理文件
+    # 检查是否有发布任务引用此素材
+    linked_tasks = db.query(PublishTask).filter(PublishTask.material_id == material_id).count()
+    if linked_tasks > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无法删除：此素材被 {linked_tasks} 个发布任务引用。请先删除相关任务或取消任务关联。"
+        )
+
+    # 删除物理文件（原文件）
     if material.file_path and os.path.exists(material.file_path):
         try:
             os.remove(material.file_path)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning(f"[Materials] 删除文件失败 {material.file_path}: {e}")
+
+    # 删除缩略图文件（如果与原文件不同）
+    if material.thumbnail_path and material.thumbnail_path != material.file_path:
+        if os.path.exists(material.thumbnail_path):
+            try:
+                os.remove(material.thumbnail_path)
+            except OSError as e:
+                logger.warning(f"[Materials] 删除缩略图失败 {material.thumbnail_path}: {e}")
 
     db.delete(material)
     db.commit()

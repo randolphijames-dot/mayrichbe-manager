@@ -106,6 +106,13 @@
           >
             <Zap :size="13" /> 批量发布 {{ selectedMaterials.length }} 个
           </button>
+          <button
+            v-if="currentView === 'grid' && selectedMaterials.length > 0"
+            class="btn btn-secondary btn-sm"
+            @click="openBatchEdit"
+          >
+            <Pencil :size="13" /> 批量编辑
+          </button>
           <button class="btn btn-secondary btn-sm" @click="loadAll"><RefreshCw :size="13" /></button>
           <button class="btn btn-primary btn-sm" @click="openUpload">
             <Upload :size="13" /> 上传素材
@@ -132,7 +139,12 @@
             @click="batchMode && toggleMaterialSelection(m.id)"
           >
             <!-- 预览 -->
-            <div class="rounded-lg flex items-center justify-center relative overflow-hidden" style="background:var(--bg-base); height:150px; border:1px solid var(--border-light)">
+            <div
+              class="rounded-lg flex items-center justify-center relative overflow-hidden"
+              style="background:var(--bg-base); height:150px; border:1px solid var(--border-light)"
+              :style="!dragMode && !batchMode ? 'cursor:pointer' : ''"
+              @click.stop="!dragMode && !batchMode && openPreview(m)"
+            >
               <!-- 真实图片/视频预览 -->
               <template v-if="m.file_url">
                 <!-- 图片预览 -->
@@ -203,6 +215,7 @@
             <!-- 操作 -->
             <div class="flex gap-1.5 mt-auto pt-1">
               <button class="btn btn-primary btn-sm flex-1" @click="openTaskModal(m)"><Zap :size="11" /> 发布</button>
+              <button class="btn btn-ghost btn-sm" @click="openEditModal(m)"><Pencil :size="11" /></button>
               <button class="btn btn-ghost btn-sm" @click="openAssign(m)"><Users :size="11" /></button>
               <button class="btn btn-ghost btn-sm" style="color:#ef4444" @click="handleDelete(m)"><Trash2 :size="11" /></button>
             </div>
@@ -341,6 +354,113 @@
             <button class="btn btn-primary" @click="handleUpload" :disabled="uploading || !uploadFile">
               <span v-if="uploading" class="w-4 h-4 border-2 rounded-full animate-spin" style="border-color:rgba(255,255,255,0.3); border-top-color:white"></span>
               上传
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ─── 编辑素材 Modal ─── -->
+    <Teleport to="body">
+      <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center" style="background:var(--modal-overlay)">
+        <div class="card" style="max-width:500px; width:100%; max-height:92vh; overflow-y:auto">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold" style="color:var(--text-primary)">编辑素材</h3>
+            <button @click="showEditModal = false" style="color:var(--text-faint)"><X :size="18" /></button>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <!-- 内部标题 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">内部标题</label>
+              <input v-model="editForm.title" class="input text-sm" placeholder="素材标题" />
+            </div>
+
+            <!-- 发布文案 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">发布文案（Caption）</label>
+              <textarea v-model="editForm.caption" class="input text-sm" rows="4" placeholder="Instagram 发布时的文案..." />
+            </div>
+
+            <!-- YouTube 标题 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">YouTube 标题</label>
+              <input v-model="editForm.yt_title" class="input text-sm" placeholder="YouTube 视频标题（可选）" />
+            </div>
+
+            <!-- 标签 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">标签（逗号分隔）</label>
+              <input v-model="editTagsInput" class="input text-sm" placeholder="标签1, 标签2, 标签3" />
+            </div>
+
+            <!-- 分配账号 -->
+            <div>
+              <label class="text-xs font-medium mb-2 block" style="color:var(--text-muted)">分配给哪些账号</label>
+              <div class="flex flex-wrap gap-2 p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border); min-height:44px">
+                <button
+                  v-for="a in accounts"
+                  :key="a.id"
+                  class="badge cursor-pointer transition-all"
+                  :class="editForm.target_account_ids.includes(a.id)
+                    ? (a.platform === 'instagram' ? 'badge-pink' : 'badge-red')
+                    : 'badge-gray'"
+                  @click="toggleEditAccount(a.id)"
+                >
+                  {{ a.platform === 'instagram' ? '📸' : '▶' }} {{ a.username }}
+                </button>
+                <span v-if="accounts.length === 0" class="text-xs" style="color:var(--text-faint)">先在账号管理页添加账号</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 mt-5">
+            <button class="btn btn-ghost" @click="showEditModal = false">取消</button>
+            <button class="btn btn-primary" @click="handleEditSave" :disabled="editSaving">
+              <span v-if="editSaving" class="w-4 h-4 border-2 rounded-full animate-spin" style="border-color:rgba(255,255,255,0.3); border-top-color:white"></span>
+              保存
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ─── 批量编辑 Modal ─── -->
+    <Teleport to="body">
+      <div v-if="showBatchEditModal" class="fixed inset-0 z-50 flex items-center justify-center" style="background:var(--modal-overlay)">
+        <div class="card" style="max-width:500px; width:100%; max-height:92vh; overflow-y:auto">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-semibold" style="color:var(--text-primary)">批量编辑 {{ selectedMaterials.length }} 个素材</h3>
+              <p class="text-xs mt-0.5" style="color:var(--text-faint)">修改的内容会统一应用到所有选中素材</p>
+            </div>
+            <button @click="showBatchEditModal = false" style="color:var(--text-faint)"><X :size="18" /></button>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <!-- 发布文案 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">统一文案（Caption）</label>
+              <textarea v-model="batchEditCaption" class="input text-sm" rows="5" placeholder="将统一应用到所有选中素材的文案..." />
+            </div>
+
+            <!-- 选中素材预览 -->
+            <div class="p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
+              <div class="text-xs mb-2" style="color:var(--text-muted)">将更新以下素材：</div>
+              <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                <span v-for="mid in selectedMaterials.slice(0, 20)" :key="mid" class="badge badge-blue" style="font-size:10px">
+                  {{ materials.find(m => m.id === mid)?.title || '素材 #' + mid }}
+                </span>
+                <span v-if="selectedMaterials.length > 20" class="badge badge-gray" style="font-size:10px">+{{ selectedMaterials.length - 20 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 mt-5">
+            <button class="btn btn-ghost" @click="showBatchEditModal = false">取消</button>
+            <button class="btn btn-primary" @click="handleBatchEditSave" :disabled="batchEditSaving || !batchEditCaption.trim()">
+              <span v-if="batchEditSaving" class="w-4 h-4 border-2 rounded-full animate-spin" style="border-color:rgba(255,255,255,0.3); border-top-color:white"></span>
+              更新 {{ selectedMaterials.length }} 个素材
             </button>
           </div>
         </div>
@@ -702,6 +822,52 @@
 
   </div>
 
+  <!-- ─── 素材预览 Modal ─── -->
+  <Teleport to="body">
+    <div v-if="showPreviewModal && previewMaterial" class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.85)" @click.self="showPreviewModal = false">
+      <div class="flex flex-col items-center gap-4" style="max-width:90vw; max-height:90vh">
+        <!-- 关闭按钮 -->
+        <button class="absolute top-4 right-4 text-white opacity-70 hover:opacity-100 transition-opacity" @click="showPreviewModal = false">
+          <X :size="28" />
+        </button>
+
+        <!-- 图片预览 -->
+        <img
+          v-if="previewMaterial.material_type === 'image'"
+          :src="previewMaterial.file_url"
+          :alt="previewMaterial.title"
+          style="max-width:90vw; max-height:75vh; object-fit:contain; border-radius:8px"
+        />
+
+        <!-- 视频播放器 -->
+        <video
+          v-else-if="previewMaterial.material_type === 'video'"
+          :src="previewMaterial.file_url"
+          controls
+          autoplay
+          style="max-width:90vw; max-height:75vh; border-radius:8px"
+        ></video>
+
+        <!-- 素材信息 -->
+        <div class="card" style="width:100%; max-width:600px; padding:16px">
+          <div class="flex flex-col gap-2">
+            <p class="text-sm font-semibold" style="color:var(--text-primary)">{{ previewMaterial.title || '素材 #' + previewMaterial.id }}</p>
+            <p v-if="previewMaterial.caption" class="text-xs" style="color:var(--text-muted); white-space:pre-wrap">{{ previewMaterial.caption }}</p>
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="badge badge-gray" style="font-size:10px">{{ previewMaterial.material_type }}</span>
+              <span v-if="previewMaterial.folder_tag" class="badge badge-blue" style="font-size:10px">📁 {{ previewMaterial.folder_tag }}</span>
+              <span v-for="tag in (previewMaterial.tags || [])" :key="tag" class="badge badge-purple" style="font-size:10px">🏷️ {{ tag }}</span>
+            </div>
+            <div v-if="previewMaterial.target_account_ids?.length" class="flex flex-wrap gap-1">
+              <span class="text-xs" style="color:var(--text-faint)">已分配：</span>
+              <span v-for="aid in previewMaterial.target_account_ids" :key="aid" class="badge badge-gray" style="font-size:10px">{{ accountName(aid) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- ─── 拖拽模式：账号拖放区域 ─── -->
   <Teleport to="body">
     <transition name="slide-up">
@@ -741,7 +907,7 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
-import { Upload, RefreshCw, X, Users, Zap, Trash2, Layers, FolderOpen, CheckSquare, ImageIcon, Move } from 'lucide-vue-next'
+import { Upload, RefreshCw, X, Users, Zap, Trash2, Layers, FolderOpen, CheckSquare, ImageIcon, Move, Pencil } from 'lucide-vue-next'
 import { materialsApi, accountsApi, tasksApi, showToast } from '@/api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -775,7 +941,7 @@ const showBatchPublishModal = ref(false)
 const selectedAccounts = ref<number[]>([])
 const batchPublishForm = reactive({
   scheduled_at: '',
-  random_offset: 30,
+  random_offset: 0,
   match_mode: 'all', // 'all' = 全组合, 'one-to-one' = 一对一
 })
 
@@ -802,7 +968,7 @@ function openBatchPublish() {
   if (selectedMaterials.value.length === 0) return
   selectedAccounts.value = []
   batchPublishForm.scheduled_at = dayjs().add(1, 'hour').format('YYYY-MM-DDTHH:mm')
-  batchPublishForm.random_offset = 30
+  batchPublishForm.random_offset = 0
   batchPublishForm.match_mode = 'all' // 默认全组合模式
   showBatchPublishModal.value = true
 }
@@ -978,6 +1144,94 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+// ─── 编辑素材 ───
+const showEditModal = ref(false)
+const editSaving = ref(false)
+const editingMaterial = ref<any>(null)
+const editForm = reactive({
+  title: '',
+  caption: '',
+  yt_title: '',
+  target_account_ids: [] as number[],
+})
+const editTagsInput = ref('')
+
+function openEditModal(m: any) {
+  editingMaterial.value = m
+  editForm.title = m.title || ''
+  editForm.caption = m.caption || ''
+  editForm.yt_title = m.yt_title || ''
+  editForm.target_account_ids = [...(m.target_account_ids || [])]
+  editTagsInput.value = (m.tags || []).join(', ')
+  showEditModal.value = true
+}
+
+function toggleEditAccount(id: number) {
+  const idx = editForm.target_account_ids.indexOf(id)
+  if (idx >= 0) editForm.target_account_ids.splice(idx, 1)
+  else editForm.target_account_ids.push(id)
+}
+
+async function handleEditSave() {
+  if (!editingMaterial.value) return
+  editSaving.value = true
+  try {
+    const tags = editTagsInput.value
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean)
+    await materialsApi.update(editingMaterial.value.id, {
+      title: editForm.title,
+      caption: editForm.caption,
+      yt_title: editForm.yt_title,
+      tags,
+      target_account_ids: editForm.target_account_ids,
+    })
+    showEditModal.value = false
+    await loadAll()
+    showToast('素材已更新')
+  } finally {
+    editSaving.value = false
+  }
+}
+
+// ─── 素材预览 ───
+const showPreviewModal = ref(false)
+const previewMaterial = ref<any>(null)
+
+function openPreview(m: any) {
+  previewMaterial.value = m
+  showPreviewModal.value = true
+}
+
+// ─── 批量编辑 ───
+const showBatchEditModal = ref(false)
+const batchEditSaving = ref(false)
+const batchEditCaption = ref('')
+
+function openBatchEdit() {
+  if (selectedMaterials.value.length === 0) return
+  batchEditCaption.value = ''
+  showBatchEditModal.value = true
+}
+
+async function handleBatchEditSave() {
+  if (!batchEditCaption.value.trim()) return
+  batchEditSaving.value = true
+  try {
+    for (const mid of selectedMaterials.value) {
+      await materialsApi.update(mid, { caption: batchEditCaption.value })
+    }
+    showBatchEditModal.value = false
+    selectedMaterials.value = []
+    batchMode.value = false
+    await loadAll()
+    showToast(`已更新 ${selectedMaterials.value.length || '全部'} 个素材的文案`)
+  } finally {
+    batchEditSaving.value = false
+  }
+}
+
 // ─── 上传 ───
 const showUploadModal = ref(false)
 const uploadFile = ref<File|null>(null)
@@ -1040,7 +1294,7 @@ async function handleDelete(m: any) {
 // ─── 单素材发布 Modal ───
 const showTaskModal = ref(false)
 const selectedMaterial = ref<any>(null)
-const taskForm = reactive({ account_ids: [] as number[], scheduled_at: '', random_offset: 30, instant: true })
+const taskForm = reactive({ account_ids: [] as number[], scheduled_at: '', random_offset: 0, instant: true })
 const taskAdvanced = ref(false)
 
 // 时区 & 快捷预设
@@ -1091,7 +1345,7 @@ async function submitTask() {
       material_id: selectedMaterial.value.id,
       account_ids: taskForm.account_ids,
       instant: taskForm.instant,
-      random_offset_minutes: taskForm.random_offset,
+      random_offset_minutes: taskAdvanced.value ? taskForm.random_offset : 0,
     }
 
     // 只有定时发布模式才传 scheduled_at
@@ -1118,7 +1372,7 @@ const selectedInBoard = computed(() => {
   return [...mids]
 })
 const showBoardModal = ref(false)
-const boardForm = reactive({ scheduled_at: '', random_offset: 30 })
+const boardForm = reactive({ scheduled_at: '', random_offset: 0 })
 const boardAdvanced = ref(false)
 
 function isBoardSelected(mid: number, aid: number) {
@@ -1138,7 +1392,7 @@ function boardAccountName(id: string) {
 }
 function openBoardPublish() {
   boardForm.scheduled_at = dayjs().add(1, 'h').format('YYYY-MM-DDTHH:mm')
-  boardForm.random_offset = 30
+  boardForm.random_offset = 0
   showBoardModal.value = true
 }
 async function submitBoardPublish() {
@@ -1160,7 +1414,7 @@ async function submitBoardPublish() {
         material_id: mid,
         account_ids: aids,
         scheduled_at: scheduledLocal,
-        random_offset_minutes: boardForm.random_offset,
+        random_offset_minutes: boardAdvanced.value ? boardForm.random_offset : 0,
       })
     }
     boardSelections.value.clear()

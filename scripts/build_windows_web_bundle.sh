@@ -19,6 +19,7 @@ cp "$ROOT/ACCOUNT_IMPORT_TEMPLATE.csv" "$BUNDLE_DIR/"
 echo "[3/4] 复制 backend（保留完整功能，排除运行时垃圾）..."
 rsync -a \
   --exclude ".venv" \
+  --exclude "venv" \
   --exclude "__pycache__" \
   --exclude "*.pyc" \
   --exclude "dist" \

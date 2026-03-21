@@ -39,3 +39,23 @@ debug_screens/
 Mayrichbe-Manager-Windows/
 Mayrichbe_Manager_Windows.zip
 *.exe
+
+# Runtime data
+instagrapi_sessions/
+
+# Agent / editor configs
+.agents/
+.cursor/
+AGENTS.md
+
+# Temp / personal
+ahs/
+build/
+codex输出/
+记忆库/
+
+# Deploy secrets (only .example is committed)
+deploy/.env.multi
+deploy/.env.prod
+deploy/htpasswd
+deploy/conf.d/

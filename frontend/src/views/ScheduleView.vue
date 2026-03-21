@@ -50,10 +50,12 @@
             <td class="text-xs" style="color:var(--text-faint)">{{ task.id }}</td>
             <td>
               <span class="badge" :class="getPlatformBadge(task.account_id)">
-                #{{ task.account_id }}
+                {{ accountMap[task.account_id]?.username || '#' + task.account_id }}
               </span>
             </td>
-            <td class="text-xs" style="color:var(--text-muted)">#{{ task.material_id }}</td>
+            <td class="text-xs" style="color:var(--text-muted); max-width:200px" :title="materialDisplayName(task.material_id)">
+              <span class="truncate block">{{ materialDisplayName(task.material_id) }}</span>
+            </td>
             <td>
               <div class="flex flex-col gap-0.5">
                 <span class="text-sm" :style="isOverdue(task) ? 'color:#f87171' : 'color:var(--text-muted)'">
@@ -105,12 +107,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RefreshCw, CalendarDays } from 'lucide-vue-next'
-import { tasksApi, accountsApi } from '@/api'
+import { tasksApi, accountsApi, materialsApi } from '@/api'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
 const tasks = ref<any[]>([])
 const accounts = ref<any[]>([])
+const materials = ref<any[]>([])
 const filterStatus = ref('')
 const filterAccountId = ref('')
 
@@ -119,6 +122,20 @@ const accountMap = computed(() => {
   accounts.value.forEach(a => { m[a.id] = a })
   return m
 })
+
+const materialMap = computed(() => {
+  const m: Record<number, any> = {}
+  materials.value.forEach(mat => { m[mat.id] = mat })
+  return m
+})
+
+function materialDisplayName(materialId: number) {
+  const mat = materialMap.value[materialId]
+  if (!mat) return '#' + materialId
+  if (mat.caption) return mat.caption.length > 30 ? mat.caption.slice(0, 30) + '...' : mat.caption
+  if (mat.title) return mat.title
+  return '素材 #' + mat.id
+}
 
 const filteredTasks = computed(() =>
   tasks.value.filter(t => {
@@ -163,6 +180,10 @@ async function handleRetry(id: number) {
 }
 
 onMounted(async () => {
-  await Promise.all([loadTasks(), accountsApi.list({ limit: 500 }).then(r => { accounts.value = r as any[] })])
+  await Promise.all([
+    loadTasks(),
+    accountsApi.list({ limit: 500 }).then(r => { accounts.value = r as any[] }),
+    materialsApi.list({ limit: 500 }).then(r => { materials.value = r as any[] }),
+  ])
 })
 </script>

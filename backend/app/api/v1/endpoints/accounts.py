@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.account import Account, Platform, AccountStatus, BrowserType
 from app.schemas.account import AccountCreate, AccountUpdate, AccountOut, AccountImportRow
-from app.core.encryption import encrypt
+from app.core.encryption import encrypt, safe_decrypt
 
 router = APIRouter(prefix="/accounts", tags=["账号管理"])
 
@@ -241,20 +241,59 @@ async def import_accounts_csv(
 
 @router.post("/{account_id}/check-status", response_model=AccountOut)
 def check_account_status(account_id: int, db: Session = Depends(get_db)):
-    """手动触发账号健康检测（异步任务）
+    """手动触发账号登录检测
 
-    最小可用版本实现：
-    - 直接将账号状态标记为 ACTIVE
-    - 更新 last_checked_at 为当前时间
-    - 不做真实外部检测，仅作为「已检测」标记
+    - instagrapi 账号：实际尝试登录，返回真实状态
+    - 指纹浏览器账号：无法自动检测，返回 422
     """
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="账号不存在")
 
-    # 最小可用版：直接标记为已检测且状态正常
-    account.status = AccountStatus.ACTIVE
     account.last_checked_at = datetime.utcnow()
+
+    # 指纹浏览器账号无法在服务器端自动检测
+    if account.browser_type != BrowserType.NONE:
+        db.commit()
+        raise HTTPException(
+            status_code=422,
+            detail="指纹浏览器账号无法自动检测，请通过浏览器手动确认登录状态"
+        )
+
+    # instagrapi 账号：需要密码才能检测
+    password = safe_decrypt(account.ins_password_encrypted)
+    if not password:
+        account.status = AccountStatus.UNKNOWN
+        db.commit()
+        db.refresh(account)
+        return _account_to_out(account)
+
+    totp_secret = safe_decrypt(account.ins_totp_secret_encrypted)
+
+    try:
+        from instagrapi import Client
+
+        cl = Client()
+
+        # 禁止交互式验证码等待，防止阻塞服务器
+        def _no_challenge(username, choice):
+            raise RuntimeError("需要邮件/短信验证码，请先通过手机 App 完成验证后再检测")
+        cl.challenge_code_handler = _no_challenge
+
+        if account.proxy:
+            cl.set_proxy(account.proxy)
+
+        totp_code = ""
+        if totp_secret:
+            import pyotp
+            totp_code = pyotp.TOTP(totp_secret).now()
+
+        cl.login(account.username, password, verification_code=totp_code)
+        account.status = AccountStatus.ACTIVE
+
+    except Exception:
+        account.status = AccountStatus.SUSPENDED
+
     db.commit()
     db.refresh(account)
     return _account_to_out(account)

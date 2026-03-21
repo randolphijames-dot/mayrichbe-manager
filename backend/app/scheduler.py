@@ -5,7 +5,9 @@ APScheduler 调度引擎（替代 Celery + Redis）
 - 线程池：最多 8 个并发任务（避免同时操作太多账号）
 """
 import logging
+import time
 from datetime import datetime, timedelta
+from collections import defaultdict
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -13,6 +15,9 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 logger = logging.getLogger(__name__)
 
 _scheduler: BackgroundScheduler | None = None
+
+# 全局变量：记录每个账号最后发布时间（防止频繁发布触发 Instagram 检测）
+_last_publish_time = defaultdict(lambda: 0)
 
 
 def _write_log(db, task_id: int | None, account_id: int | None, level: str, event: str, message: str, detail: str | None = None):
@@ -187,7 +192,25 @@ def _publish_instagram(task, account, material, db):
 
         # 根据账号配置选择发布引擎
         if account.browser_type == BrowserType.NONE or not account.browser_type:
-            # instagrapi 方式（模拟安卓 App）
+            # instagrapi 方式（模拟安卓 App）- 需要频率限制防止被封
+            account_id = account.id
+            now = time.time()
+            last_time = _last_publish_time[account_id]
+
+            # 检查距离上次发布是否超过 1 小时（3600 秒）
+            if now - last_time < 3600:
+                wait_minutes = int((3600 - (now - last_time)) / 60)
+                error_msg = (
+                    f"⏰ 发布过于频繁！\n"
+                    f"请等待 {wait_minutes} 分钟后再试\n"
+                    f"建议：每个账号每小时最多发布 1 次"
+                )
+                task.status = TaskStatus.FAILED
+                task.error_message = error_msg
+                db.commit()
+                _write_log(db, task.id, account.id, "warning", "rate_limit", error_msg)
+                return
+
             from app.services.instagrapi_publisher import publish_video, publish_image
             publisher_fn = (
                 publish_video
@@ -208,6 +231,8 @@ def _publish_instagram(task, account, material, db):
             task.status = TaskStatus.SUCCESS
             task.result_url = post_url
             task.error_message = None
+            # 更新最后发布时间（用于频率限制）
+            _last_publish_time[account_id] = time.time()
             db.commit()
         else:
             # 指纹浏览器方式（AdsPower / 比特浏览器）

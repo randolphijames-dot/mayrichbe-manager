@@ -39,7 +39,7 @@ def _get_client(account_id: int, username: str, password: str, proxy: Optional[s
     # 尝试复用 session（包含了设备指纹、MAC地址、Android ID 和 登录 Cookies）
     session_file = SESSION_DIR / f"{account_id}_session.json"
     logged_in = False
-    
+
     if session_file.exists():
         try:
             cl.load_settings(str(session_file))
@@ -61,6 +61,42 @@ def _get_client(account_id: int, username: str, password: str, proxy: Optional[s
                 raise RuntimeError("账号开启了两步验证，请在账号设置中填写 TOTP 密钥")
             cl.login(username, password, verification_code=_get_totp_code(totp_secret))
             logged_in = True
+        except Exception as e:
+            error_msg = str(e).lower()
+
+            # 检测 IP 被封（关键错误）
+            if 'blacklist' in error_msg or 'ip address' in error_msg:
+                raise RuntimeError(
+                    "⚠️ Instagram 已封禁当前 IP 地址！\n"
+                    "建议：\n"
+                    "1. 停止使用 instagrapi 24-48 小时\n"
+                    "2. 更换 IP 地址或使用代理\n"
+                    "3. 改用 BitBrowser 模式\n"
+                    "4. 或部署到云端 VPS"
+                )
+
+            # 检测密码错误
+            if 'password' in error_msg and 'incorrect' in error_msg:
+                raise RuntimeError(
+                    "❌ 密码错误或账号被锁定\n"
+                    "建议：\n"
+                    "1. 检查账号密码是否正确\n"
+                    "2. 用手机登录确认账号状态\n"
+                    "3. 可能需要更换 IP"
+                )
+
+            # 检测需要验证
+            if 'challenge' in error_msg or 'checkpoint' in error_msg:
+                raise RuntimeError(
+                    "⚠️ Instagram 要求安全验证\n"
+                    "建议：\n"
+                    "1. 用手机登录完成验证\n"
+                    "2. 24 小时后再尝试自动化\n"
+                    "3. 考虑使用 BitBrowser 模式"
+                )
+
+            # 其他错误
+            raise RuntimeError(f"登录失败: {e}")
 
     if not logged_in:
         raise RuntimeError(f"instagrapi 登录失败：{username}")
@@ -100,8 +136,9 @@ def publish_video(
     totp_secret = safe_decrypt(totp_secret_encrypted) if totp_secret_encrypted else None
     cl = _get_client(account_id, username, password, proxy, totp_secret)
 
-    # 随机延迟（模拟人工操作）
-    time.sleep(random.uniform(2, 5))
+    # 随机延迟（模拟人工操作，防止被检测）
+    wait_time = random.uniform(30, 60)
+    time.sleep(wait_time)
 
     try:
         from instagrapi.types import StoryHashtag
@@ -134,7 +171,9 @@ def publish_image(
     totp_secret = safe_decrypt(totp_secret_encrypted) if totp_secret_encrypted else None
     cl = _get_client(account_id, username, password, proxy, totp_secret)
 
-    time.sleep(random.uniform(2, 5))
+    # 随机延迟（模拟人工操作，防止被检测）
+    wait_time = random.uniform(30, 60)
+    time.sleep(wait_time)
 
     try:
         media = cl.photo_upload(Path(file_path), caption=caption or "")

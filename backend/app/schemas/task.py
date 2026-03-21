@@ -20,7 +20,7 @@ class BatchTaskCreate(BaseModel):
     account_ids: List[int]
     scheduled_at: Optional[datetime] = None
     instant: bool = Field(default=False, description="立即执行（忽略 scheduled_at）")
-    random_offset_minutes: int = Field(default=30, ge=0, le=120)
+    random_offset_minutes: int = Field(default=0, ge=0, le=120)
     notes: Optional[str] = None
 
 

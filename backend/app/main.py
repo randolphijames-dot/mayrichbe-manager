@@ -133,8 +133,20 @@ if os.path.exists(uploads_dir):
 static_dir = find_static_dir()
 if static_dir:
     import logging
+    from fastapi.responses import FileResponse
     logging.getLogger(__name__).info(f"[Main] 静态文件目录: {static_dir}")
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+
+    # 挂载静态资源（CSS、JS、图片等）
+    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+
+    # SPA fallback：所有未匹配的路由返回 index.html（Vue Router 接管）
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Vue Router History Mode 支持：所有未匹配路由返回 index.html"""
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return {"detail": "Not Found"}
 else:
     import logging
     logging.warning(f"[Main] ⚠️ 未找到静态文件目录，前端页面将无法访问")

@@ -46,6 +46,9 @@
         <router-link to="/accounts" class="nav-item" :class="{ active: $route.path === '/accounts' }">
           <Users :size="15" /><span>账号管理</span>
         </router-link>
+        <router-link to="/publish-status" class="nav-item" :class="{ active: $route.path === '/publish-status' }">
+          <Monitor :size="15" /><span>发布状态</span>
+        </router-link>
         <router-link to="/materials" class="nav-item" :class="{ active: $route.path === '/materials' }">
           <Image :size="15" /><span>素材库</span>
         </router-link>
@@ -119,7 +122,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { LayoutDashboard, Users, Image, CalendarDays, ScrollText, BookOpen, BarChart2, ListChecks, UserCog, MessageSquare, Zap } from 'lucide-vue-next'
+import { LayoutDashboard, Users, Image, CalendarDays, ScrollText, BookOpen, BarChart2, ListChecks, UserCog, MessageSquare, Zap, Monitor } from 'lucide-vue-next'
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { getAccessToken, setAccessToken } from '@/api'
@@ -160,6 +163,8 @@ async function submitPassword() {
 const pageMeta: Record<string, { title: string; desc: string }> = {
   '/': { title: '仪表盘', desc: '总览所有账号与发布状态' },
   '/accounts': { title: '账号管理', desc: '管理 Instagram 和 YouTube 账号' },
+  '/publish-status': { title: '发布状态', desc: '确认所有账号发布成功并查看实时数据' },
+  '/monitor': { title: '多账号监控', desc: '查看账号实时状态和最新帖子' },
   '/materials': { title: '素材库', desc: '上传和管理发布内容' },
   '/schedule': { title: '任务列表', desc: '查看和管理所有发布任务' },
   '/calendar': { title: '发布日历', desc: '按日历视图查看发布计划' },

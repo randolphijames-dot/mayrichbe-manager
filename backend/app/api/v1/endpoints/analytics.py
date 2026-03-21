@@ -173,3 +173,106 @@ def get_daily_ranking(
         "count": len(ranking),
         "items": ranking,
     }
+
+
+@router.get("/metrics-latest")
+def get_latest_metrics(db: Session = Depends(get_db)):
+    """获取所有任务的最新数据快照"""
+    # 获取每个任务的最新快照
+    from sqlalchemy import func
+    subq = (
+        db.query(
+            PostMetricSnapshot.task_id,
+            func.max(PostMetricSnapshot.snapshot_at).label('max_snapshot_at')
+        )
+        .group_by(PostMetricSnapshot.task_id)
+        .subquery()
+    )
+
+    latest_snapshots = (
+        db.query(PostMetricSnapshot)
+        .join(
+            subq,
+            (PostMetricSnapshot.task_id == subq.c.task_id) &
+            (PostMetricSnapshot.snapshot_at == subq.c.max_snapshot_at)
+        )
+        .all()
+    )
+
+    return [
+        {
+            "task_id": s.task_id,
+            "account_id": s.account_id,
+            "platform": s.platform,
+            "views": s.views,
+            "likes": s.likes,
+            "comments": s.comments,
+            "snapshot_at": s.snapshot_at.isoformat() if s.snapshot_at else None,
+        }
+        for s in latest_snapshots
+    ]
+
+
+@router.post("/metrics/{task_id}/refresh")
+def refresh_task_metrics(task_id: int, db: Session = Depends(get_db)):
+    """手动刷新指定任务的数据（立即采集）"""
+    from app.models.task import PublishTask, TaskStatus
+    from app.services.analytics_collector import _collect_instagram_metrics, _collect_youtube_metrics
+    from datetime import datetime
+    from app.core.timezone import now as tz_now
+
+    # 获取任务
+    task = db.query(PublishTask).filter(PublishTask.id == task_id).first()
+    if not task:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    if task.status != TaskStatus.SUCCESS:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="只能刷新成功发布的任务")
+
+    if not task.result_url:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="任务缺少 result_url")
+
+    # 采集数据
+    platform = getattr(task.account.platform, "value", task.account.platform)
+    try:
+        if platform == "instagram":
+            metrics = _collect_instagram_metrics(task)
+        elif platform == "youtube":
+            metrics = _collect_youtube_metrics(task)
+        else:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail=f"不支持的平台: {platform}")
+
+        # 保存快照
+        snapshot = PostMetricSnapshot(
+            task_id=task.id,
+            account_id=task.account_id,
+            material_id=task.material_id,
+            platform=metrics["platform"],
+            post_id=metrics.get("post_id"),
+            post_url=metrics.get("post_url"),
+            views=metrics.get("views", 0),
+            likes=metrics.get("likes", 0),
+            comments=metrics.get("comments", 0),
+            snapshot_at=datetime.utcnow(),
+            snapshot_date=tz_now().date(),
+        )
+        db.add(snapshot)
+        db.commit()
+        db.refresh(snapshot)
+
+        return {
+            "success": True,
+            "metrics": {
+                "views": snapshot.views,
+                "likes": snapshot.likes,
+                "comments": snapshot.comments,
+                "snapshot_at": snapshot.snapshot_at.isoformat(),
+            }
+        }
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"采集失败: {str(e)}")
