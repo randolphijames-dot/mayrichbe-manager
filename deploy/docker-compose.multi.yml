@@ -1,0 +1,123 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Social Manager - 多租户 Docker Compose
+#  用法: docker compose -f docker-compose.multi.yml --env-file .env.multi up -d
+#  用户管理: ./manage-users.sh add/remove/list
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+services:
+
+  # ─── Nginx 反向代理（所有用户共享） ───
+  nginx:
+    image: nginx:alpine
+    container_name: sm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-multi.conf:/etc/nginx/nginx.conf:ro
+      - ./conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - sm-net
+
+  # ─── User 01 ───
+  sm-user01:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: sm-user01
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
+      - SECRET_KEY=${USER01_SECRET_KEY:?Set USER01_SECRET_KEY in .env.multi}
+      - ACCESS_PASSWORD=${USER01_ACCESS_PASSWORD:-}
+      - DATABASE_URL=sqlite:////app/data/social_manager.db
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - /data/sm/user01/data:/app/data
+      - /data/sm/user01/uploads:/app/uploads
+      - /data/sm/user01/sessions:/app/instagrapi_sessions
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sm-net
+
+  # ─── User 02 ───
+  sm-user02:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: sm-user02
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
+      - SECRET_KEY=${USER02_SECRET_KEY:?Set USER02_SECRET_KEY in .env.multi}
+      - ACCESS_PASSWORD=${USER02_ACCESS_PASSWORD:-}
+      - DATABASE_URL=sqlite:////app/data/social_manager.db
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - /data/sm/user02/data:/app/data
+      - /data/sm/user02/uploads:/app/uploads
+      - /data/sm/user02/sessions:/app/instagrapi_sessions
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sm-net
+
+  # ─── User 03 ───
+  sm-user03:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: sm-user03
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
+      - SECRET_KEY=${USER03_SECRET_KEY:?Set USER03_SECRET_KEY in .env.multi}
+      - ACCESS_PASSWORD=${USER03_ACCESS_PASSWORD:-}
+      - DATABASE_URL=sqlite:////app/data/social_manager.db
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - /data/sm/user03/data:/app/data
+      - /data/sm/user03/uploads:/app/uploads
+      - /data/sm/user03/sessions:/app/instagrapi_sessions
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - sm-net
+
+  # ─── 新用户在此下方追加（manage-users.sh 会自动操作） ───
+  # MARKER:NEW_USER_ABOVE
+
+networks:
+  sm-net:
+    driver: bridge

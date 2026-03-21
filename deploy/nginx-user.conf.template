@@ -1,0 +1,63 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Social Manager - 用户 Nginx 配置模板
+#  manage-users.sh 会用 sed 替换以下占位符:
+#    __USERNAME__  → 用户名 (如 user01)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name __USERNAME__.sm.example.com;
+
+    # SSL 证书（通配符证书，所有子域名共用）
+    ssl_certificate     /etc/letsencrypt/live/sm.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/sm.example.com/privkey.pem;
+
+    # SSL 安全设置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # 上传大小限制
+    client_max_body_size 500m;
+
+    # 所有请求代理到该用户的容器
+    location / {
+        proxy_pass http://sm-__USERNAME__:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+
+        # WebSocket 支持（如果将来需要）
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # 文件上传专用（更长超时）
+    location /api/v1/materials/upload {
+        proxy_pass http://sm-__USERNAME__:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+        client_max_body_size 500m;
+    }
+
+    # 健康检查
+    location /health {
+        proxy_pass http://sm-__USERNAME__:8000/health;
+        access_log off;
+    }
+
+    # 静态资源缓存
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
+        proxy_pass http://sm-__USERNAME__:8000;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+}
