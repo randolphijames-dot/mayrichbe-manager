@@ -21,6 +21,7 @@ class AccountBase(BaseModel):
 class AccountCreate(AccountBase):
     ins_password: Optional[str] = Field(None, description="INS 密码（写入后加密存储，接口不返回）")
     ins_totp_secret: Optional[str] = Field(None, description="INS TOTP 2FA 密钥")
+    ins_session_id: Optional[str] = Field(None, description="INS 浏览器 sessionid（优先于密码登录，免安全验证）")
 
 
 class AccountUpdate(BaseModel):
@@ -35,13 +36,15 @@ class AccountUpdate(BaseModel):
     status: Optional[AccountStatus] = None
     ins_password: Optional[str] = None
     ins_totp_secret: Optional[str] = None
+    ins_session_id: Optional[str] = None
 
 
 class AccountOut(AccountBase):
     id: int
     status: AccountStatus
-    has_password: bool = False    # 是否已存储密码（不返回明文）
+    has_password: bool = False
     has_totp: bool = False
+    has_session_id: bool = False
     has_yt_token: bool = False
     created_at: datetime
     updated_at: datetime

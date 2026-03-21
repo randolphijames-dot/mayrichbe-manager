@@ -37,6 +37,12 @@ def _safe_migrate() -> None:
         ("accounts", "ins_totp_secret_encrypted", "TEXT"),
         ("accounts", "ins_session_id_encrypted", "TEXT"),
         ("materials", "folder_tag", "VARCHAR(50)"),
+        # Phase 2: 数据隔离 — 5 张表加 owner_id（DEFAULT 1 = 归属种子 admin）
+        ("accounts", "owner_id", "INTEGER DEFAULT 1"),
+        ("materials", "owner_id", "INTEGER DEFAULT 1"),
+        ("publish_tasks", "owner_id", "INTEGER DEFAULT 1"),
+        ("publish_logs", "owner_id", "INTEGER DEFAULT 1"),
+        ("post_metric_snapshots", "owner_id", "INTEGER DEFAULT 1"),
     ]
 
     with engine.connect() as conn:

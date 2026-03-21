@@ -11,6 +11,7 @@ class PostMetricSnapshot(Base):
     __tablename__ = "post_metric_snapshots"
 
     id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, default=1, nullable=False, comment="所属用户 ID（数据隔离）")
     task_id = Column(Integer, ForeignKey("publish_tasks.id"), nullable=False, index=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
     material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)

@@ -1,12 +1,13 @@
 """自动截流 API"""
 import threading
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.models.account import Account
+from app.api.deps import get_current_user, verify_batch_ownership
 
 router = APIRouter(prefix="/traffic", tags=["自动截流"])
 
@@ -24,14 +25,19 @@ class TrafficTask(BaseModel):
 
 
 @router.post("/run")
-def run_traffic_task(req: TrafficTask, db: Session = Depends(get_db)):
+def run_traffic_task(req: TrafficTask, request: Request, db: Session = Depends(get_db)):
     """
     启动截流任务（后台异步执行）
     mode="hashtag": 从话题标签下的帖子截流
     mode="competitor": 从对标账号的粉丝截流
     """
+    user = get_current_user(request)
+
     if req.action == "comment" and not req.comment_text:
         raise HTTPException(status_code=400, detail="选择「评论」动作时必须填写评论话术")
+
+    # 验证 account_ids 属于当前用户
+    verify_batch_ownership(db, Account, req.account_ids, user)
 
     accounts = db.query(Account).filter(
         Account.id.in_(req.account_ids),
@@ -48,7 +54,7 @@ def run_traffic_task(req: TrafficTask, db: Session = Depends(get_db)):
     # 生成唯一任务 key
     import time
     task_key = f"traffic_{int(time.time())}"
-    _running_tasks[task_key] = {"status": "running", "results": [], "done": 0, "total": len(accounts)}
+    _running_tasks[task_key] = {"status": "running", "results": [], "done": 0, "total": len(accounts), "owner_id": user["user_id"]}
 
     def _run():
         all_results = []
@@ -89,15 +95,24 @@ def run_traffic_task(req: TrafficTask, db: Session = Depends(get_db)):
 
 
 @router.get("/status/{task_key}")
-def get_task_status(task_key: str):
+def get_task_status(task_key: str, request: Request):
     """查询截流任务进度"""
+    user = get_current_user(request)
     task = _running_tasks.get(task_key)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    # 非 admin 只能查看自己创建的截流任务
+    if not user.get("is_admin") and task.get("owner_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="无权查看此任务")
     return task
 
 
 @router.get("/status")
-def list_recent_tasks():
+def list_recent_tasks(request: Request):
     """列出最近的截流任务"""
-    return list(_running_tasks.items())[-10:]
+    user = get_current_user(request)
+    items = list(_running_tasks.items())[-10:]
+    if user.get("is_admin"):
+        return items
+    # 普通用户只返回自己的截流任务
+    return [(k, v) for k, v in items if v.get("owner_id") == user["user_id"]]

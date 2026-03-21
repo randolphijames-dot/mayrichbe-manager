@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: Optional[str] = None
 
     # 访问控制（设置后 API 需要 X-Access-Token 请求头）
+    ACCESS_USERNAME: Optional[str] = None
     ACCESS_PASSWORD: Optional[str] = None
 
     class Config:

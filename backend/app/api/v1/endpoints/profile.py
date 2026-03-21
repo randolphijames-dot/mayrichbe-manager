@@ -1,13 +1,14 @@
 """批量账号资料管理 API（简介、头像）"""
 import os
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.models.account import Account
 from app.core.config import settings
+from app.api.deps import get_current_user, verify_ownership
 
 router = APIRouter(prefix="/profile", tags=["账号资料"])
 
@@ -36,6 +37,7 @@ class ProfileJobStatus(BaseModel):
 @router.post("/batch-bio")
 async def batch_update_bio(
     req: BatchBioRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
@@ -43,12 +45,16 @@ async def batch_update_bio(
     批量修改多个账号的 Instagram 简介。
     后台异步执行，立即返回任务 ID 列表。
     """
+    user = get_current_user(request)
     results = []
     for item in req.updates:
-        account = db.query(Account).filter(Account.id == item.account_id).first()
-        if not account:
-            results.append({"account_id": item.account_id, "status": "error", "message": "账号不存在"})
+        # 验证每个账号的所有权
+        try:
+            account = verify_ownership(db, Account, item.account_id, user)
+        except HTTPException as e:
+            results.append({"account_id": item.account_id, "status": "error", "message": e.detail})
             continue
+
         if not account.ins_password_encrypted:
             results.append({
                 "account_id": item.account_id,
@@ -98,13 +104,13 @@ async def _do_update_bio(account_id, username, pw_enc, bio, proxy, totp_enc):
 @router.post("/upload-avatar/{account_id}")
 async def upload_avatar(
     account_id: int,
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
     """上传单个账号头像文件，保存到临时目录"""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    user = get_current_user(request)
+    account = verify_ownership(db, Account, account_id, user)
 
     # 检查文件类型
     if not file.content_type.startswith("image/"):
@@ -132,17 +138,21 @@ class BatchAvatarRequest(BaseModel):
 @router.post("/batch-avatar")
 async def batch_update_avatar(
     req: BatchAvatarRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """批量更换头像（每账号独立头像，需先通过 /upload-avatar/ 上传）"""
+    user = get_current_user(request)
     results = []
     avatar_dir = os.path.join(settings.UPLOAD_DIR, "avatars")
 
     for account_id in req.account_ids:
-        account = db.query(Account).filter(Account.id == account_id).first()
-        if not account:
-            results.append({"account_id": account_id, "status": "error", "message": "账号不存在"})
+        # 验证账号所有权
+        try:
+            account = verify_ownership(db, Account, account_id, user)
+        except HTTPException as e:
+            results.append({"account_id": account_id, "status": "error", "message": e.detail})
             continue
 
         # 找到该账号的头像文件
@@ -199,11 +209,10 @@ async def _do_update_avatar(account_id, username, pw_enc, image_path, proxy, tot
 # ─── 获取账号当前资料 ───
 
 @router.get("/info/{account_id}")
-def get_account_profile(account_id: int, db: Session = Depends(get_db)):
+def get_account_profile(account_id: int, request: Request, db: Session = Depends(get_db)):
     """拉取账号的真实 Instagram 资料"""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    user = get_current_user(request)
+    account = verify_ownership(db, Account, account_id, user)
     if not account.ins_password_encrypted:
         raise HTTPException(status_code=400, detail="需要密码才能拉取资料")
 

@@ -29,6 +29,7 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, default=1, nullable=False, comment="所属用户 ID（数据隔离）")
     name = Column(String(100), nullable=False, comment="账号显示名")
     username = Column(String(100), nullable=False, comment="平台用户名")
     platform = Column(SAEnum(Platform), nullable=False, comment="平台类型")
@@ -51,6 +52,7 @@ class Account(Base):
     # Instagram 登录（可选加密存储）
     ins_password_encrypted = Column(Text, nullable=True, comment="INS 密码（AES 加密存储）")
     ins_totp_secret_encrypted = Column(Text, nullable=True, comment="INS 2FA TOTP 密钥（AES 加密）")
+    ins_session_id_encrypted = Column(Text, nullable=True, comment="INS 浏览器 sessionid（AES 加密，优先于密码登录）")
 
     # YouTube OAuth（YouTube 专用）
     yt_oauth_token = Column(Text, nullable=True, comment="YouTube OAuth2 Token JSON")

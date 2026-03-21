@@ -33,6 +33,7 @@ class Material(Base):
     __tablename__ = "materials"
 
     id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, default=1, nullable=False, comment="所属用户 ID（数据隔离）")
     title = Column(String(200), nullable=True, comment="素材标题/描述（内部标识用）")
     material_type = Column(SAEnum(MaterialType), nullable=False)
     status = Column(SAEnum(MaterialStatus), default=MaterialStatus.PENDING)

@@ -33,6 +33,7 @@ services:
       - TZ=Asia/Tokyo
       - PYTHONUNBUFFERED=1
       - SECRET_KEY=${USER01_SECRET_KEY:?Set USER01_SECRET_KEY in .env.multi}
+      - ACCESS_USERNAME=${USER01_ACCESS_USERNAME:-}
       - ACCESS_PASSWORD=${USER01_ACCESS_PASSWORD:-}
       - DATABASE_URL=sqlite:////app/data/social_manager.db
       - UPLOAD_DIR=/app/uploads
@@ -64,6 +65,7 @@ services:
       - TZ=Asia/Tokyo
       - PYTHONUNBUFFERED=1
       - SECRET_KEY=${USER02_SECRET_KEY:?Set USER02_SECRET_KEY in .env.multi}
+      - ACCESS_USERNAME=${USER02_ACCESS_USERNAME:-}
       - ACCESS_PASSWORD=${USER02_ACCESS_PASSWORD:-}
       - DATABASE_URL=sqlite:////app/data/social_manager.db
       - UPLOAD_DIR=/app/uploads
@@ -95,6 +97,7 @@ services:
       - TZ=Asia/Tokyo
       - PYTHONUNBUFFERED=1
       - SECRET_KEY=${USER03_SECRET_KEY:?Set USER03_SECRET_KEY in .env.multi}
+      - ACCESS_USERNAME=${USER03_ACCESS_USERNAME:-}
       - ACCESS_PASSWORD=${USER03_ACCESS_PASSWORD:-}
       - DATABASE_URL=sqlite:////app/data/social_manager.db
       - UPLOAD_DIR=/app/uploads

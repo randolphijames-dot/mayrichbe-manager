@@ -1,17 +1,19 @@
 """发布日志 API"""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.log import PublishLog, LogLevel
 from app.schemas.task import LogOut
+from app.api.deps import get_current_user, apply_owner_filter
 
 router = APIRouter(prefix="/logs", tags=["发布日志"])
 
 
 @router.get("/", response_model=List[LogOut])
 def list_logs(
+    request: Request,
     account_id: Optional[int] = Query(None),
     task_id: Optional[int] = Query(None),
     level: Optional[LogLevel] = Query(None),
@@ -21,7 +23,9 @@ def list_logs(
     db: Session = Depends(get_db),
 ):
     """获取发布日志"""
+    user = get_current_user(request)
     q = db.query(PublishLog)
+    q = apply_owner_filter(q, PublishLog, user)
     if account_id:
         q = q.filter(PublishLog.account_id == account_id)
     if task_id:

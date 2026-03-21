@@ -1,6 +1,6 @@
 """YouTube OAuth 授权绑定 API"""
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -9,19 +9,18 @@ from app.models.account import Account, Platform
 from app.models.oauth_state import OAuthState
 from app.services.youtube_publisher import build_oauth_flow, YouTubePublisher
 from app.core.config import settings
+from app.api.deps import get_current_user, verify_ownership
 
 router = APIRouter(prefix="/youtube", tags=["YouTube OAuth"])
 
 
 @router.get("/oauth/start/{account_id}")
-def start_oauth(account_id: int, db: Session = Depends(get_db)):
+def start_oauth(account_id: int, request: Request, db: Session = Depends(get_db)):
     """开始 YouTube OAuth 授权流程，返回授权 URL"""
-    account = db.query(Account).filter(
-        Account.id == account_id,
-        Account.platform == Platform.YOUTUBE,
-    ).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="YouTube 账号不存在")
+    user = get_current_user(request)
+    account = verify_ownership(db, Account, account_id, user)
+    if account.platform != Platform.YOUTUBE:
+        raise HTTPException(status_code=400, detail="此账号不是 YouTube 平台")
 
     flow = build_oauth_flow()
     auth_url, state = flow.authorization_url(
@@ -78,14 +77,12 @@ def oauth_callback(
 
 
 @router.get("/channel-info/{account_id}")
-def get_channel_info(account_id: int, db: Session = Depends(get_db)):
+def get_channel_info(account_id: int, request: Request, db: Session = Depends(get_db)):
     """获取 YouTube 频道信息"""
-    account = db.query(Account).filter(
-        Account.id == account_id,
-        Account.platform == Platform.YOUTUBE,
-    ).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    user = get_current_user(request)
+    account = verify_ownership(db, Account, account_id, user)
+    if account.platform != Platform.YOUTUBE:
+        raise HTTPException(status_code=400, detail="此账号不是 YouTube 平台")
     if not account.yt_oauth_token:
         raise HTTPException(status_code=400, detail="该账号未授权 YouTube OAuth，请先授权")
 

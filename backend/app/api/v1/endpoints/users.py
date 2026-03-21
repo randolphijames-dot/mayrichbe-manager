@@ -8,19 +8,12 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
 
 # ─── 权限依赖 ───
-
-def get_current_user(request: Request) -> dict:
-    """从 request.state.user 获取当前用户（中间件已写入）"""
-    user_info = getattr(request.state, "user", None)
-    if not user_info or not user_info.get("user_id"):
-        raise HTTPException(status_code=401, detail="未登录")
-    return user_info
-
 
 def require_admin(user: dict = Depends(get_current_user)) -> dict:
     """要求当前用户是管理员"""

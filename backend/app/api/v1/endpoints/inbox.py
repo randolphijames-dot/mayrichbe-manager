@@ -1,12 +1,13 @@
 """消息中心 API：评论 + 私信集中管理"""
 import threading
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.models.account import Account
+from app.api.deps import get_current_user, apply_owner_filter, verify_ownership
 
 router = APIRouter(prefix="/inbox", tags=["消息中心"])
 
@@ -49,6 +50,7 @@ class ReplyRequest(BaseModel):
 
 @router.get("/comments")
 def get_all_comments(
+    request: Request,
     account_id: Optional[int] = None,
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -56,7 +58,8 @@ def get_all_comments(
     """拉取所有（或指定）账号的最新评论"""
     import time as _time
 
-    accounts = _get_target_accounts(account_id, db)
+    user = get_current_user(request)
+    accounts = _get_target_accounts(account_id, db, user)
     all_comments = []
 
     # 清理过期缓存
@@ -94,6 +97,7 @@ def get_all_comments(
 
 @router.get("/dm")
 def get_all_dm(
+    request: Request,
     account_id: Optional[int] = None,
     limit: int = 30,
     db: Session = Depends(get_db),
@@ -101,7 +105,8 @@ def get_all_dm(
     """拉取所有（或指定）账号的最新私信"""
     import time as _time
 
-    accounts = _get_target_accounts(account_id, db)
+    user = get_current_user(request)
+    accounts = _get_target_accounts(account_id, db, user)
     all_dm = []
 
     # 清理过期缓存
@@ -138,8 +143,9 @@ def get_all_dm(
 # ─── 刷新缓存（手动触发） ─────────────────────────
 
 @router.post("/refresh")
-def refresh_inbox(account_id: Optional[int] = None, db: Session = Depends(get_db)):
+def refresh_inbox(request: Request, account_id: Optional[int] = None, db: Session = Depends(get_db)):
     """清除缓存，让下次请求重新拉取"""
+    get_current_user(request)  # 确认已登录
     keys_to_clear = [k for k in _cache if account_id is None or k.endswith(f"_{account_id}")]
     for k in keys_to_clear:
         _cache.pop(k, None)
@@ -150,11 +156,11 @@ def refresh_inbox(account_id: Optional[int] = None, db: Session = Depends(get_db
 # ─── 回复接口 ────────────────────────────────────
 
 @router.post("/reply")
-def reply_message(req: ReplyRequest, db: Session = Depends(get_db)):
+def reply_message(req: ReplyRequest, request: Request, db: Session = Depends(get_db)):
     """回复评论或私信"""
-    account = db.query(Account).filter(Account.id == req.account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="账号不存在")
+    user = get_current_user(request)
+    # 验证账号所有权
+    account = verify_ownership(db, Account, req.account_id, user)
     if not account.ins_password_encrypted:
         raise HTTPException(status_code=400, detail="该账号未保存密码，无法回复")
     if not req.text.strip():
@@ -175,11 +181,16 @@ def reply_message(req: ReplyRequest, db: Session = Depends(get_db)):
 
 # ─── 工具函数 ────────────────────────────────────
 
-def _get_target_accounts(account_id: Optional[int], db: Session) -> list:
+def _get_target_accounts(account_id: Optional[int], db: Session, user: dict) -> list:
+    """获取目标账号列表（带数据隔离）"""
     if account_id:
-        acc = db.query(Account).filter(Account.id == account_id).first()
-        return [acc] if acc else []
-    return db.query(Account).filter(
+        # 指定单个账号时，验证所有权
+        acc = verify_ownership(db, Account, account_id, user)
+        return [acc]
+    # 查询所有 Instagram 活跃账号（按用户隔离）
+    q = db.query(Account).filter(
         Account.platform == "instagram",
         Account.is_active == True,
-    ).all()
+    )
+    q = apply_owner_filter(q, Account, user)
+    return q.all()

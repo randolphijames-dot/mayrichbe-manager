@@ -21,6 +21,7 @@ class PublishTask(Base):
     __tablename__ = "publish_tasks"
 
     id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, default=1, nullable=False, comment="所属用户 ID（数据隔离）")
 
     # 关联
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)

@@ -117,8 +117,16 @@ def _collect_youtube_metrics(task: PublishTask) -> dict[str, Any]:
     }
 
 
-def collect_post_metrics(db: Session, lookback_days: int = 30, task_limit: int = 300) -> dict[str, int]:
+def collect_post_metrics(
+    db: Session,
+    lookback_days: int = 30,
+    task_limit: int = 300,
+    owner_id: int | None = None,
+) -> dict[str, int]:
     """采集最近成功发布任务的作品表现数据并写入快照。
+
+    参数：
+    - owner_id: 如果传入，只采集该用户的任务；None 表示采集全部（admin / 定时任务）。
 
     说明：
     - 标准版按「快照」存储，不覆盖历史，便于每日排名和趋势计算。
@@ -128,15 +136,15 @@ def collect_post_metrics(db: Session, lookback_days: int = 30, task_limit: int =
     snapshot_at = datetime.utcnow()
     snapshot_date = now().date()
 
-    tasks = (
+    q = (
         db.query(PublishTask)
         .filter(PublishTask.status == TaskStatus.SUCCESS)
         .filter(PublishTask.result_url.isnot(None))
         .filter(PublishTask.updated_at >= since)
-        .order_by(PublishTask.updated_at.desc())
-        .limit(task_limit)
-        .all()
     )
+    if owner_id is not None:
+        q = q.filter(PublishTask.owner_id == owner_id)
+    tasks = q.order_by(PublishTask.updated_at.desc()).limit(task_limit).all()
 
     created = 0
     skipped = 0
@@ -166,6 +174,7 @@ def collect_post_metrics(db: Session, lookback_days: int = 30, task_limit: int =
                 comments=_to_int(metrics.get("comments")),
                 snapshot_at=snapshot_at,
                 snapshot_date=snapshot_date,
+                owner_id=task.owner_id,
             )
             db.add(row)
             created += 1

@@ -278,6 +278,11 @@
                   <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">2FA TOTP 密钥（如开启了两步验证）</label>
                   <input v-model="form.ins_totp_secret" class="input font-mono text-sm" placeholder="32位 Base32 密钥（可选）" />
                 </div>
+                <div class="p-3 rounded-lg" style="background:#0c1a2e; border:1px solid #1e40af">
+                  <label class="text-xs font-medium mb-1 block" style="color:#93c5fd">🔑 Session ID（推荐填写，免安全验证）</label>
+                  <input v-model="form.ins_session_id" class="input font-mono text-sm" placeholder="从浏览器复制 sessionid（可选）" />
+                  <p class="text-xs mt-1.5 leading-relaxed" style="color:#64748b">填了就不需要密码也能发布，且不会触发安全验证。<br>获取方式：BitBrowser 打开 Instagram → F12 → Application → Cookies → instagram.com → 复制 sessionid 的值</p>
+                </div>
                 <div class="p-2 rounded" style="background:#422006; border:1px solid #92400e">
                   <p class="text-xs" style="color:#fde68a">⚠️ instagrapi 为非官方方案，风险略高于指纹浏览器。建议配合代理使用，单账号每日发布 ≤ 3 次。</p>
                 </div>
@@ -363,7 +368,7 @@ const publishMethods = [
 const formDefault = () => ({
   name: '', username: '', platform: 'instagram', group_name: '',
   publish_method: 'adspower', browser_profile_id: '',
-  ins_password: '', ins_totp_secret: '',
+  ins_password: '', ins_totp_secret: '', ins_session_id: '',
   proxy: '', notes: '',
 })
 const form = reactive(formDefault())
@@ -465,6 +470,7 @@ function handleEdit(record: any) {
     notes: record.notes || '',
     ins_password: '',
     ins_totp_secret: '',
+    ins_session_id: '',
   })
   showModal.value = true
 }
@@ -485,6 +491,7 @@ async function handleSubmit() {
     }
     if (form.ins_password) payload.ins_password = form.ins_password
     if (form.ins_totp_secret) payload.ins_totp_secret = form.ins_totp_secret
+    if (form.ins_session_id) payload.ins_session_id = form.ins_session_id
     if (editRecord.value) { await accountsApi.update(editRecord.value.id, payload); showToast('更新成功') }
     else { await accountsApi.create(payload); showToast('创建成功') }
     showModal.value = false

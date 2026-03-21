@@ -6,7 +6,7 @@ import os
 import shutil
 import subprocess
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.models.account import Account
 from app.models.material import Material, MaterialType, MaterialStatus
 from app.schemas.material import MaterialCreate, MaterialUpdate, MaterialOut
+from app.api.deps import get_current_user, apply_owner_filter, verify_ownership, verify_batch_ownership
 
 router = APIRouter(prefix="/materials", tags=["素材管理"])
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ def _resolve_ffmpeg_executable() -> Optional[str]:
 
 @router.get("/", response_model=List[MaterialOut])
 def list_materials(
+    request: Request,
     material_type: Optional[MaterialType] = None,
     status: Optional[MaterialStatus] = None,
     skip: int = 0,
@@ -53,7 +55,9 @@ def list_materials(
     db: Session = Depends(get_db),
 ):
     """获取素材列表"""
+    user = get_current_user(request)
     q = db.query(Material)
+    q = apply_owner_filter(q, Material, user)
     if material_type:
         q = q.filter(Material.material_type == material_type)
     if status:
@@ -64,6 +68,7 @@ def list_materials(
 
 @router.post("/upload", response_model=MaterialOut, status_code=status.HTTP_201_CREATED)
 async def upload_material(
+    request: Request,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     caption: Optional[str] = Form(None),
@@ -76,6 +81,9 @@ async def upload_material(
     db: Session = Depends(get_db),
 ):
     """上传素材文件"""
+    user = get_current_user(request)
+    owner_id = user["user_id"]
+
     # 文件大小检查
     content = await file.read()
     max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
@@ -134,12 +142,10 @@ async def upload_material(
         except ValueError:
             raise HTTPException(status_code=400, detail="target_account_ids 格式错误，请用逗号分隔整数")
 
-    # 验证账号存在
+    # 验证账号存在 + 所有权
     accounts = []
     if account_ids:
-        accounts = db.query(Account).filter(Account.id.in_(account_ids)).all()
-        if len(accounts) != len(account_ids):
-            raise HTTPException(status_code=404, detail="部分账号 ID 不存在")
+        accounts = verify_batch_ownership(db, Account, account_ids, user)
 
     material = Material(
         title=title or file.filename,
@@ -155,6 +161,7 @@ async def upload_material(
         yt_privacy=yt_privacy,
         folder_tag=folder_tag,
         target_accounts=accounts,
+        owner_id=owner_id,
     )
     db.add(material)
     db.commit()
@@ -163,20 +170,18 @@ async def upload_material(
 
 
 @router.get("/{material_id}", response_model=MaterialOut)
-def get_material(material_id: int, db: Session = Depends(get_db)):
+def get_material(material_id: int, request: Request, db: Session = Depends(get_db)):
     """获取单个素材"""
-    material = db.query(Material).filter(Material.id == material_id).first()
-    if not material:
-        raise HTTPException(status_code=404, detail="素材不存在")
+    user = get_current_user(request)
+    material = verify_ownership(db, Material, material_id, user)
     return MaterialOut.from_orm_with_accounts(material)
 
 
 @router.patch("/{material_id}", response_model=MaterialOut)
-def update_material(material_id: int, payload: MaterialUpdate, db: Session = Depends(get_db)):
+def update_material(material_id: int, payload: MaterialUpdate, request: Request, db: Session = Depends(get_db)):
     """更新素材信息"""
-    material = db.query(Material).filter(Material.id == material_id).first()
-    if not material:
-        raise HTTPException(status_code=404, detail="素材不存在")
+    user = get_current_user(request)
+    material = verify_ownership(db, Material, material_id, user)
 
     update_data = payload.model_dump(exclude_unset=True)
     account_ids = update_data.pop("target_account_ids", None)
@@ -191,7 +196,8 @@ def update_material(material_id: int, payload: MaterialUpdate, db: Session = Dep
         setattr(material, k, v)
 
     if account_ids is not None:
-        accounts = db.query(Account).filter(Account.id.in_(account_ids)).all()
+        # 验证关联账号的所有权
+        accounts = verify_batch_ownership(db, Account, account_ids, user)
         material.target_accounts = accounts
 
     db.commit()
@@ -200,13 +206,12 @@ def update_material(material_id: int, payload: MaterialUpdate, db: Session = Dep
 
 
 @router.delete("/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_material(material_id: int, db: Session = Depends(get_db)):
+def delete_material(material_id: int, request: Request, db: Session = Depends(get_db)):
     """删除素材（同时删除本地文件）"""
     from app.models.task import PublishTask
 
-    material = db.query(Material).filter(Material.id == material_id).first()
-    if not material:
-        raise HTTPException(status_code=404, detail="素材不存在")
+    user = get_current_user(request)
+    material = verify_ownership(db, Material, material_id, user)
 
     # 检查是否有发布任务引用此素材
     linked_tasks = db.query(PublishTask).filter(PublishTask.material_id == material_id).count()

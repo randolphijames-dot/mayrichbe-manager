@@ -2,18 +2,22 @@
 import random
 from datetime import timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models.account import Account
+from app.models.material import Material
 from app.models.task import PublishTask, TaskStatus
 from app.schemas.task import TaskCreate, BatchTaskCreate, TaskUpdate, TaskOut
+from app.api.deps import get_current_user, apply_owner_filter, verify_ownership, verify_batch_ownership
 
 router = APIRouter(prefix="/tasks", tags=["发布任务"])
 
 
 @router.get("/", response_model=List[TaskOut])
 def list_tasks(
+    request: Request,
     account_id: Optional[int] = Query(None),
     status: Optional[TaskStatus] = Query(None),
     skip: int = 0,
@@ -21,7 +25,9 @@ def list_tasks(
     db: Session = Depends(get_db),
 ):
     """获取任务列表"""
+    user = get_current_user(request)
     q = db.query(PublishTask)
+    q = apply_owner_filter(q, PublishTask, user)
     if account_id:
         q = q.filter(PublishTask.account_id == account_id)
     if status:
@@ -30,9 +36,16 @@ def list_tasks(
 
 
 @router.post("/", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
+def create_task(payload: TaskCreate, request: Request, db: Session = Depends(get_db)):
     """创建单个发布任务"""
-    task = PublishTask(**payload.model_dump())
+    user = get_current_user(request)
+    owner_id = user["user_id"]
+
+    # 验证 account 和 material 属于当前用户
+    verify_ownership(db, Account, payload.account_id, user)
+    verify_ownership(db, Material, payload.material_id, user)
+
+    task = PublishTask(**payload.model_dump(), owner_id=owner_id)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -45,9 +58,16 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/batch", response_model=List[TaskOut], status_code=status.HTTP_201_CREATED)
-def create_batch_tasks(payload: BatchTaskCreate, db: Session = Depends(get_db)):
-    """批量创建任务：一个素材 × 多个账号（支持随机时间窗口）"""
+def create_batch_tasks(payload: BatchTaskCreate, request: Request, db: Session = Depends(get_db)):
+    """批量创建任务：一个素材 x 多个账号（支持随机时间窗口）"""
     from app.core.timezone import now_naive
+
+    user = get_current_user(request)
+    owner_id = user["user_id"]
+
+    # 验证所有 account_ids 和 material_id 属于当前用户
+    verify_batch_ownership(db, Account, payload.account_ids, user)
+    verify_ownership(db, Material, payload.material_id, user)
 
     # 立即执行模式：使用当前时间，不再叠加随机延迟
     if payload.instant:
@@ -73,6 +93,7 @@ def create_batch_tasks(payload: BatchTaskCreate, db: Session = Depends(get_db)):
             scheduled_at=actual_scheduled,
             random_offset_minutes=offset_minutes,
             notes=payload.notes,
+            owner_id=owner_id,
         )
         db.add(task)
         tasks.append(task)
@@ -86,19 +107,17 @@ def create_batch_tasks(payload: BatchTaskCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{task_id}", response_model=TaskOut)
-def get_task(task_id: int, db: Session = Depends(get_db)):
-    task = db.query(PublishTask).filter(PublishTask.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+def get_task(task_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    task = verify_ownership(db, PublishTask, task_id, user)
     return task
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
-def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)):
+def update_task(task_id: int, payload: TaskUpdate, request: Request, db: Session = Depends(get_db)):
     """更新任务（只允许 PENDING 状态的任务修改）"""
-    task = db.query(PublishTask).filter(PublishTask.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+    user = get_current_user(request)
+    task = verify_ownership(db, PublishTask, task_id, user)
     if task.status not in (TaskStatus.PENDING, TaskStatus.FAILED):
         raise HTTPException(status_code=400, detail="只有 pending/failed 状态的任务可以修改")
 
@@ -112,11 +131,10 @@ def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)
 
 
 @router.post("/{task_id}/cancel", response_model=TaskOut)
-def cancel_task(task_id: int, db: Session = Depends(get_db)):
+def cancel_task(task_id: int, request: Request, db: Session = Depends(get_db)):
     """取消任务"""
-    task = db.query(PublishTask).filter(PublishTask.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+    user = get_current_user(request)
+    task = verify_ownership(db, PublishTask, task_id, user)
     if task.status in (TaskStatus.SUCCESS, TaskStatus.CANCELLED):
         raise HTTPException(status_code=400, detail="任务已完成或已取消")
 
@@ -134,11 +152,10 @@ def cancel_task(task_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{task_id}/retry", response_model=TaskOut)
-def retry_task(task_id: int, db: Session = Depends(get_db)):
+def retry_task(task_id: int, request: Request, db: Session = Depends(get_db)):
     """手动重试失败任务"""
-    task = db.query(PublishTask).filter(PublishTask.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+    user = get_current_user(request)
+    task = verify_ownership(db, PublishTask, task_id, user)
     if task.status != TaskStatus.FAILED:
         raise HTTPException(status_code=400, detail="只有 failed 状态的任务可以重试")
 

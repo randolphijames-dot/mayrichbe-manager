@@ -98,6 +98,7 @@ cmd_add() {
 
 # --- $USERNAME ---
 ${UPPER_NAME}_SECRET_KEY=$SECRET_KEY
+${UPPER_NAME}_ACCESS_USERNAME=$USERNAME
 ${UPPER_NAME}_ACCESS_PASSWORD=$ACCESS_PASS
 EOF
         info "Credentials added to .env.multi"
@@ -122,6 +123,7 @@ EOF
       - TZ=Asia/Tokyo
       - PYTHONUNBUFFERED=1
       - SECRET_KEY=\${${UPPER_NAME}_SECRET_KEY:?Set ${UPPER_NAME}_SECRET_KEY in .env.multi}
+      - ACCESS_USERNAME=\${${UPPER_NAME}_ACCESS_USERNAME:-}
       - ACCESS_PASSWORD=\${${UPPER_NAME}_ACCESS_PASSWORD:-}
       - DATABASE_URL=sqlite:////app/data/social_manager.db
       - UPLOAD_DIR=/app/uploads
@@ -189,10 +191,11 @@ PYEOF
     info "User '$USERNAME' created successfully!"
     echo ""
     echo "  URL:      https://${USERNAME}.sm.mayrichbe.cam"
+    echo "  Username: $USERNAME"
     echo "  Password: $ACCESS_PASS"
     echo ""
-    echo "  IMPORTANT: Save the password above!"
-    echo "  It is also stored in: $ENV_FILE"
+    echo "  IMPORTANT: Save the credentials above!"
+    echo "  They are also stored in: $ENV_FILE"
     echo "================================================"
 }
 
