@@ -54,32 +54,34 @@
       <div class="mb-4 p-3 rounded-lg" style="background:#0c1a2e; border:1px solid #1d4ed8">
         <p class="text-xs font-semibold mb-1" style="color:#60a5fa">📌 核心原则</p>
         <p class="text-xs leading-relaxed" style="color:var(--text-muted)">
-          每个 Instagram 账号必须对应一个独立的指纹浏览器 Profile + 独立代理 IP。
-          这是防封号的基础，平台通过「设备指纹」识别多账号关联。
+          每个 Instagram 账号配独立代理 IP，这是防封号的基础。
+          推荐使用<strong style="color:var(--text-primary)">「模拟手机 instagrapi」模式 + Session ID</strong>，无需安装任何浏览器。
         </p>
       </div>
 
-      <div class="grid grid-cols-2 gap-3 mb-4">
-        <div class="p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
-          <p class="text-sm font-medium mb-2" style="color:var(--text-primary)">📱 方式 A：AdsPower</p>
-          <ol class="text-xs space-y-1" style="color:var(--text-muted)">
-            <li>1. 下载安装 AdsPower（官网：adspower.net）</li>
-            <li>2. 为每个 INS 账号新建一个 Profile</li>
-            <li>3. 在 Profile 里配置代理 IP</li>
-            <li>4. 手动登录 Instagram（只需一次）</li>
-            <li>5. 复制 Profile ID（数字+字母串）</li>
-            <li>6. 在本系统填入 browser_profile_id</li>
+      <div class="flex flex-col gap-3 mb-4">
+        <div class="p-3 rounded-lg" style="background:var(--bg-base); border:2px solid #166534">
+          <p class="text-sm font-medium mb-2" style="color:#4ade80">⚡ 推荐方式：模拟手机（instagrapi + Session ID）</p>
+          <ol class="text-xs space-y-1.5" style="color:var(--text-muted)">
+            <li>1. 在「账号管理」点「新增账号」，发布方式选<strong style="color:var(--text-primary)">「模拟手机」</strong></li>
+            <li>2. 填入 Instagram 用户名</li>
+            <li>3. 填入 <strong style="color:#60a5fa">Session ID</strong>（推荐）或密码：
+              <div class="mt-1 p-2 rounded" style="background:#0c1a2e; border:1px solid #1e40af">
+                <p class="text-xs" style="color:#93c5fd">Session ID 获取方式：比特浏览器打开 Instagram 并登录 → F12 → Application → Cookies → instagram.com → 复制 <code>sessionid</code> 的值</p>
+                <p class="text-xs mt-1" style="color:#4ade80">有了 Session ID 就不需要填密码，且不会触发安全验证</p>
+              </div>
+            </li>
+            <li>4. 填入独立代理 IP（格式：<code style="color:#60a5fa">http://user:pass@ip:port</code>）</li>
+            <li>5. 保存即可，系统到点自动发帖</li>
           </ol>
         </div>
         <div class="p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
-          <p class="text-sm font-medium mb-2" style="color:var(--text-primary)">🌐 方式 B：比特浏览器</p>
+          <p class="text-sm font-medium mb-2" style="color:var(--text-primary)">🌐 备用方式：比特浏览器</p>
+          <p class="text-xs mb-2" style="color:var(--text-muted)">当某个账号风控特别严、instagrapi 发不出去时，可以切换到比特浏览器模式：</p>
           <ol class="text-xs space-y-1" style="color:var(--text-muted)">
-            <li>1. 下载比特浏览器（bitbrowser.cn）</li>
-            <li>2. 同样为每账号创建独立窗口</li>
-            <li>3. 配置代理 IP + 登录账号</li>
-            <li>4. 查看「窗口 ID」（在列表里）</li>
-            <li>5. 选择 browser_type = bitbrowser</li>
-            <li>6. 填入对应 Profile ID</li>
+            <li>1. 下载比特浏览器（bitbrowser.cn），为账号创建独立窗口</li>
+            <li>2. 配置代理 IP + 手动登录 Instagram</li>
+            <li>3. 复制窗口 ID，在本系统选择「比特浏览器」模式并填入 Profile ID</li>
           </ol>
         </div>
       </div>
@@ -157,33 +159,30 @@
       </div>
     </div>
 
-    <!-- 给同事/外包安装使用的小白说明 -->
+    <!-- 用户管理（管理员功能） -->
     <div class="card">
       <h2 class="text-sm font-bold mb-4 flex items-center gap-2" style="color:var(--text-primary)">
         <span class="w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0" style="background:#22c55e; color:white">6</span>
-        给团队/外包安装使用（桌面应用）
+        用户管理（管理员功能）
       </h2>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-3">
         <div class="p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
-          <p class="text-sm font-medium mb-1" style="color:var(--text-primary)">🍎 Mac 用户怎么装</p>
-          <ol class="text-xs space-y-1" style="color:var(--text-muted)">
-            <li>1. 你在开发机上运行：<code style="color:#4ade80">bash electron/scripts/build-app.sh</code></li>
-            <li>2. 在 <code style="color:#60a5fa">dist-electron/</code> 目录里找到生成的 <code>.dmg</code> 文件。</li>
-            <li>3. 发给同事，他们只需要：双击 .dmg → 把图标拖到「应用程序」。</li>
-            <li>4. 第一次打开如被 macOS 拦截，点「仍要打开」即可。</li>
-          </ol>
+          <p class="text-sm font-medium mb-2" style="color:var(--text-primary)">👤 添加 / 管理用户</p>
+          <ul class="text-xs space-y-1.5" style="color:var(--text-muted)">
+            <li>• 管理员登录后，左侧菜单底部会出现「<strong style="color:var(--text-primary)">用户管理</strong>」入口</li>
+            <li>• 点击进入后可以：创建新用户、设置密码、标记为管理员、禁用/启用</li>
+            <li>• 每个用户登录后只能看到<strong style="color:#4ade80">自己创建的数据</strong>（账号、素材、任务、日志）</li>
+            <li>• 管理员可以看到所有用户的数据</li>
+          </ul>
         </div>
-        <div class="p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
-          <p class="text-sm font-medium mb-1" style="color:var(--text-primary)">🪟 Windows 用户怎么装</p>
-          <ol class="text-xs space-y-1" style="color:var(--text-muted)">
-            <li>1. 把代码拉到一台 Windows 电脑。</li>
-            <li>2. 运行 <code style="color:#4ade80">electron\\scripts\\build-backend.bat</code> 打包后端。</li>
-            <li>3. 再运行：<code style="color:#4ade80">cd electron && npm install && npm run build:win</code></li>
-            <li>4. 在 <code style="color:#60a5fa">dist-electron/</code> 里会生成安装包（.exe），发给同事双击安装即可。</li>
-          </ol>
+        <div class="p-3 rounded-lg" style="background:#0c1a2e; border:1px solid #1d4ed8">
+          <p class="text-xs font-semibold mb-1" style="color:#60a5fa">📌 给团队成员使用</p>
+          <p class="text-xs leading-relaxed" style="color:var(--text-muted)">
+            只需在「用户管理」里创建一个新账号（用户名 + 密码），把登录链接 <code style="color:#60a5fa">sm.mayrichbe.cam</code> 和账号密码发给对方即可。
+            对方打开浏览器登录就能使用，无需安装任何软件。
+          </p>
         </div>
       </div>
-      <p class="text-xs mt-3" style="color:var(--text-faint)">安装好的桌面版，会自动内置 Python 和定时引擎，<strong style="color:var(--text-primary)">使用者无需安装 Python / Redis / Celery</strong>，只需要正常登录 Instagram / YouTube 即可。</p>
     </div>
 
     <!-- 新增功能：高级运营工具 -->
@@ -275,18 +274,26 @@
       </div>
     </div>
 
-    <!-- 完整启动命令 -->
+    <!-- 云端部署 -->
     <div class="card" style="border-color:#166534">
       <h2 class="text-sm font-bold mb-3 flex items-center gap-2" style="color:#4ade80">
-        <Terminal :size="16" /> 完整启动流程
+        <Terminal :size="16" /> 系统部署信息
       </h2>
       <div class="flex flex-col gap-2">
-        <div v-for="cmd in startCmds" :key="cmd.label" class="flex items-center gap-3 p-2 rounded-lg" style="background:#052e16">
-          <span class="text-xs font-medium w-28 flex-shrink-0" style="color:#86efac">{{ cmd.label }}</span>
-          <code class="text-xs" style="color:#4ade80">{{ cmd.cmd }}</code>
+        <div class="flex items-center gap-3 p-2 rounded-lg" style="background:#052e16">
+          <span class="text-xs font-medium w-28 flex-shrink-0" style="color:#86efac">访问地址</span>
+          <code class="text-xs" style="color:#4ade80">sm.mayrichbe.cam</code>
+        </div>
+        <div class="flex items-center gap-3 p-2 rounded-lg" style="background:#052e16">
+          <span class="text-xs font-medium w-28 flex-shrink-0" style="color:#86efac">部署方式</span>
+          <code class="text-xs" style="color:#4ade80">云端 VPS + Docker（7x24 自动运行）</code>
+        </div>
+        <div class="flex items-center gap-3 p-2 rounded-lg" style="background:#052e16">
+          <span class="text-xs font-medium w-28 flex-shrink-0" style="color:#86efac">定时发布</span>
+          <code class="text-xs" style="color:#4ade80">服务器内置定时器，到点自动执行，无需保持电脑开机</code>
         </div>
       </div>
-      <p class="text-xs mt-3" style="color:var(--text-faint)">✨ 或者直接运行：<code style="color:#4ade80">./start.sh</code>（一键启动所有服务）</p>
+      <p class="text-xs mt-3" style="color:var(--text-faint)">系统运行在云端服务器上，任何设备打开浏览器访问即可使用，所有数据自动保存。</p>
     </div>
   </div>
 </template>
@@ -296,32 +303,32 @@ import { BookOpen, HelpCircle, Download, Bell, Terminal } from 'lucide-vue-next'
 
 const faqs = [
   {
-    q: '现在是完整版吗？还需要配置什么 API？',
-    a: '核心功能已经齐全。使用前只需要：① 正常运行 backend + frontend（或安装桌面版应用）② 如用 YouTube：在 Google Cloud 申请 OAuth2 密钥 ③ 如想用指纹浏览器方式：安装 AdsPower 或比特浏览器。Instagram 本身不需要官方 API，也不再需要安装 Redis/Celery。',
+    q: 'instagrapi 是什么？安全吗？',
+    a: 'instagrapi 是一个模拟 Android 手机 App 的 Python 库，无需打开浏览器就能直接发帖。<strong style="color:var(--text-primary)">推荐用 Session ID 方式登录</strong>（免密码、免安全验证），配合独立代理 IP 使用，单账号每天 3 次以内发帖是安全的。',
+  },
+  {
+    q: 'Session ID 是什么？怎么获取？',
+    a: 'Session ID 是 Instagram 的登录凭证（一串字母数字）。获取方式：用比特浏览器打开 Instagram 并登录 → 按 F12 → Application → Cookies → instagram.com → 找到 <code style="color:#60a5fa">sessionid</code> → 复制它的值。<strong style="color:#4ade80">填了 Session ID 就不需要填密码</strong>，且不会触发安全验证。',
   },
   {
     q: '上传素材后怎么分配到对应账号发布？',
     a: '两种方式：① 上传时直接选择目标账号（在素材库上传弹窗里，底部有账号多选）② 上传后在素材卡片点「安排发布」，可重新选择账号和发布时间。一个素材可分配给多个账号，系统会分别创建独立发布任务。',
   },
   {
-    q: 'Redis 和 Celery 是什么？不用它们可以吗？',
-    a: '以前的版本依赖 Redis + Celery 来做「定时发布」，现在已经改成内置的轻量定时器，所有任务直接保存在同一份数据库里。结论：<strong style="color:var(--text-primary)">你完全不用再安装或启动 Redis/Celery</strong>，只要后端程序在运行，定时发布就会自动执行。',
-  },
-  {
-    q: '比特浏览器和 AdsPower 怎么选？',
-    a: '两者功能类似，都是指纹浏览器。整体推荐优先用「模拟手机（instagrapi）」方式做矩阵发帖；当某个账号风控更严/经常异常时，再为这个账号单独切换到 AdsPower 或比特浏览器方案。',
+    q: '多个用户怎么用？数据会混在一起吗？',
+    a: '管理员在左侧「用户管理」页面可创建新用户。<strong style="color:var(--text-primary)">每个用户只能看到自己的数据</strong>（账号、素材、任务、日志），管理员可以看到所有人的数据。数据完全隔离，互不影响。',
   },
   {
     q: '不想存密码，手动登录可以吗？',
-    a: '完全可以。在 AdsPower/比特浏览器里手动登录一次后，Cookie 会存在 Profile 里。系统每次发布前会先检查是否已登录，已登录就直接用，不需要密码。密码存储是可选的自动登录功能。',
+    a: '完全可以。在比特浏览器里手动登录一次后，Cookie 会存在 Profile 里。推荐的方式是：<strong style="color:var(--text-primary)">只填 Session ID</strong>，不填密码。这样系统能自动发帖，但不存储你的密码。',
   },
 ]
 
 const setupSteps = [
-  { emoji: '🌐', title: '（可选）安装指纹浏览器', desc: '如果你希望用「开浏览器」的方式发 INS：下载 AdsPower（adspower.net）或比特浏览器（bitbrowser.cn），为每个账号创建独立 Profile 并配好代理 IP。手动登录一次 Instagram 即可，Cookie 会自动保存。' },
-  { emoji: '📦', title: '配置环境变量', desc: '复制 backend/.env.example 为 .env，填写 YouTube OAuth 密钥（如有）和通知 Token（可选）。', cmd: 'cp backend/.env.example backend/.env' },
-  { emoji: '🚀', title: '启动系统（开发模式）', desc: '运行 start.sh 一键启动后端 + 前端 + 内置定时器，无需 Redis/Celery。', cmd: './start.sh' },
-  { emoji: '💻', title: '打包成桌面应用（可选）', desc: '在 Mac 上运行 electron/scripts/build-app.sh，会生成 .dmg 安装包；在 Windows 上运行 build-backend.bat + npm run build:win，会生成 .exe 安装包，方便发给团队使用。', cmd: 'bash electron/scripts/build-app.sh' },
+  { emoji: '🔑', title: '登录系统', desc: '打开 <strong style="color:#60a5fa">sm.mayrichbe.cam</strong>，用管理员账号登录。首次使用由管理员创建账号密码。' },
+  { emoji: '🌐', title: '（可选）安装比特浏览器', desc: '如果你需要用指纹浏览器方式发 INS：下载比特浏览器（bitbrowser.cn），为每个账号创建独立窗口并配好代理 IP，手动登录一次 Instagram。<strong style="color:var(--text-primary)">大多数情况下用 instagrapi 模式即可，无需安装浏览器。</strong>' },
+  { emoji: '⚡', title: '获取 Session ID（推荐）', desc: '用比特浏览器打开 Instagram 并登录 → 按 F12 → Application → Cookies → instagram.com → 复制 <code style="color:#60a5fa">sessionid</code> 的值。填入账号管理的 Session ID 字段，<strong style="color:#4ade80">有了 Session ID 就不需要填密码</strong>。' },
+  { emoji: '🛡', title: '配置独立代理 IP', desc: '每个 INS 账号强烈建议配独立的住宅代理 IP（日本节点），格式：<code style="color:#60a5fa">http://user:pass@ip:port</code>。多个账号共用同一 IP 容易被关联封号。' },
 ]
 
 const materialSteps = [
@@ -341,11 +348,6 @@ const ytSteps = [
   '在账号管理页找到 YouTube 账号，点「授权 YT」按钮，完成 OAuth 绑定。<strong style="color:#fbbf24">30+ 账号建议申请多个 Google Cloud 项目</strong>（每个项目每日 10,000 单位配额）。',
 ]
 
-const startCmds = [
-  { label: '① 一键启动（推荐）', cmd: './start.sh' },
-  { label: '② 仅启动后端 API', cmd: 'cd backend && uvicorn app.main:app --reload' },
-  { label: '③ 仅启动前端', cmd: 'cd frontend && npm run dev' },
-]
 
 const csvCols = [
   { f: 'name', desc: '账号显示名（内部用）', eg: '日本財経_01', req: true },
@@ -353,8 +355,8 @@ const csvCols = [
   { f: 'platform', desc: 'instagram 或 youtube', eg: 'instagram', req: true },
   { f: 'group_name', desc: '分组名', eg: '财经类', req: false },
   { f: 'proxy', desc: '代理地址', eg: 'http://u:p@ip:port', req: false },
-  { f: 'browser_type', desc: 'adspower 或 bitbrowser', eg: 'adspower', req: false },
-  { f: 'browser_profile_id', desc: '指纹浏览器 Profile ID', eg: 'abc123', req: false },
+  { f: 'browser_type', desc: 'bitbrowser 或留空（默认 instagrapi）', eg: 'bitbrowser', req: false },
+  { f: 'browser_profile_id', desc: '比特浏览器 Profile ID', eg: 'abc123', req: false },
   { f: 'notes', desc: '备注', eg: '主账号', req: false },
 ]
 </script>

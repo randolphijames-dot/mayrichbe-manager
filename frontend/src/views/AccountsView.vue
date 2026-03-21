@@ -123,7 +123,7 @@
             <th style="width:120px">平台</th>
             <th style="width:100px">状态</th>
             <th style="width:80px">代理</th>
-            <th>AdsPower ID</th>
+            <th>浏览器 ID</th>
             <th style="width:200px">操作</th>
           </tr>
         </thead>
@@ -229,25 +229,20 @@
               </div>
             </div>
 
-            <!-- 指纹浏览器 Profile ID（AdsPower / BitBrowser）-->
-            <div v-if="form.platform === 'instagram' && (form.publish_method === 'adspower' || form.publish_method === 'bitbrowser')">
-              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">
-                {{ form.publish_method === 'adspower' ? 'AdsPower' : '比特浏览器' }} Profile ID
-              </label>
+            <!-- 指纹浏览器 Profile ID（BitBrowser）-->
+            <div v-if="form.platform === 'instagram' && form.publish_method === 'bitbrowser'">
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">比特浏览器 Profile ID</label>
               <div class="flex gap-2">
                 <input v-model="form.browser_profile_id" class="input font-mono text-sm flex-1"
-                  :placeholder="form.publish_method === 'adspower' ? '在 AdsPower 账号列表查看' : '在比特浏览器窗口列表查看'" />
+                  placeholder="在比特浏览器窗口列表查看" />
               </div>
               <p class="text-xs mt-1.5 leading-relaxed" style="color:var(--text-faint)">
-                {{ form.publish_method === 'adspower'
-                  ? '📍 AdsPower → 打开软件 → 账号列表 → 每行最左侧的字母+数字 ID'
-                  : '📍 比特浏览器 → 主界面 → 窗口列表 → 点击窗口名旁边的「ID」复制'
-                }}
+                📍 比特浏览器 → 主界面 → 窗口列表 → 点击窗口名旁边的「ID」复制
               </p>
             </div>
 
             <!-- 指纹浏览器：密码 + TOTP（用于自动登录/重登）-->
-            <div v-if="form.platform === 'instagram' && (form.publish_method === 'adspower' || form.publish_method === 'bitbrowser')" class="flex flex-col gap-3 p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
+            <div v-if="form.platform === 'instagram' && form.publish_method === 'bitbrowser'" class="flex flex-col gap-3 p-3 rounded-lg" style="background:var(--bg-base); border:1px solid var(--border)">
               <div class="flex items-center gap-2">
                 <span class="badge badge-blue">🔐 登录凭证</span>
                 <span class="text-xs" style="color:var(--text-faint)">用于检查登录状态和自动重登</span>
@@ -360,14 +355,13 @@ const deleteTarget = ref<any>(null)
 const toast = ref<{ message: string; type: string } | null>(null)
 
 const publishMethods = [
-  { value: 'adspower',   icon: '🖥', label: 'AdsPower 浏览器',  desc: '通过指纹浏览器自动操作网页，适合少量主号' },
-  { value: 'bitbrowser', icon: '🌐', label: '比特浏览器',      desc: '国内指纹浏览器，和 AdsPower 用法类似' },
   { value: 'instagrapi', icon: '⚡', label: '模拟手机（推荐）', desc: '系统伪装成安卓 App，无需打开浏览器，适合矩阵批量' },
+  { value: 'bitbrowser', icon: '🌐', label: '比特浏览器',      desc: '指纹浏览器方式，适合风控严的主号' },
 ]
 
 const formDefault = () => ({
   name: '', username: '', platform: 'instagram', group_name: '',
-  publish_method: 'adspower', browser_profile_id: '',
+  publish_method: 'instagrapi', browser_profile_id: '',
   ins_password: '', ins_totp_secret: '', ins_session_id: '',
   proxy: '', notes: '',
 })
@@ -464,7 +458,7 @@ function handleEdit(record: any) {
     username: record.username,
     platform: record.platform,
     group_name: record.group_name || '',
-    publish_method: record.browser_type === 'bitbrowser' ? 'bitbrowser' : record.browser_type === 'none' ? 'instagrapi' : 'adspower',
+    publish_method: record.browser_type === 'bitbrowser' ? 'bitbrowser' : 'instagrapi',
     browser_profile_id: record.browser_profile_id || '',
     proxy: record.proxy || '',
     notes: record.notes || '',
@@ -476,8 +470,8 @@ function handleEdit(record: any) {
 }
 async function handleSubmit() {
   if (!form.name || !form.username) { showToast('请填写名称和用户名', 'error'); return }
-  if (form.platform === 'instagram' && form.publish_method !== 'instagrapi' && !form.browser_profile_id) {
-    showToast(`请填写 ${form.publish_method === 'adspower' ? 'AdsPower' : '比特浏览器'} Profile ID`, 'error'); return
+  if (form.platform === 'instagram' && form.publish_method === 'bitbrowser' && !form.browser_profile_id) {
+    showToast('请填写比特浏览器 Profile ID', 'error'); return
   }
   submitting.value = true
   try {
