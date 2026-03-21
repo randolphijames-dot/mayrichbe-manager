@@ -95,7 +95,7 @@ async function handleLogin() {
     if (data.username) localStorage.setItem('sm_username', data.username)
     localStorage.setItem('sm_is_admin', data.is_admin ? '1' : '0')
     const redirect = (router.currentRoute.value.query.redirect as string) || '/'
-    router.replace(redirect)
+    window.location.href = redirect
   } catch (e: any) {
     const detail = e?.response?.data?.detail
     errorMsg.value = detail || '无法连接服务器'
