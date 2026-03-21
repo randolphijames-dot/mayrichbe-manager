@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     accounts,
     analytics,
+    auth,
     inbox,
     logs,
     materials,
@@ -10,11 +11,13 @@ from app.api.v1.endpoints import (
     tasks,
     tools,
     traffic,
+    users,
     youtube,
 )
 
 api_router = APIRouter(prefix="/api/v1")
 
+api_router.include_router(auth.router)
 api_router.include_router(accounts.router)
 api_router.include_router(materials.router)
 api_router.include_router(tasks.router)
@@ -25,3 +28,4 @@ api_router.include_router(profile.router)
 api_router.include_router(inbox.router)
 api_router.include_router(traffic.router)
 api_router.include_router(analytics.router)
+api_router.include_router(users.router)

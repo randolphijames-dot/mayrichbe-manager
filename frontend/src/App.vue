@@ -1,27 +1,10 @@
 <template>
-  <!-- 访问密码弹窗 -->
-  <div v-if="needsPassword" class="fixed inset-0 z-[9999] flex items-center justify-center" style="background:rgba(0,0,0,0.8)">
-    <div style="background:#1e293b; border:1px solid #334155; border-radius:16px; padding:32px; width:360px; max-width:90vw">
-      <div class="text-center mb-6">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 text-xl font-bold" style="background:#0ea5e9; color:white">M</div>
-        <h2 class="text-base font-bold" style="color:#f1f5f9">Mayrichbe Manager</h2>
-        <p class="text-xs mt-1" style="color:#64748b">请输入访问密码</p>
-      </div>
-      <input
-        v-model="passwordInput"
-        type="password"
-        placeholder="访问密码"
-        class="input text-sm mb-3"
-        style="background:#0f172a"
-        @keyup.enter="submitPassword"
-        autofocus
-      />
-      <p v-if="passwordError" class="text-xs mb-3" style="color:#f87171">{{ passwordError }}</p>
-      <button class="btn btn-primary w-full" @click="submitPassword">确认进入</button>
-    </div>
+  <!-- 登录页：不显示侧边栏布局 -->
+  <div v-if="$route.path === '/login'" :class="{ 'theme-light': isLight }">
+    <router-view />
   </div>
 
-  <div class="flex h-screen overflow-hidden" :class="{ 'theme-light': isLight }">
+  <div v-else class="flex h-screen overflow-hidden" :class="{ 'theme-light': isLight }">
     <!-- 侧边栏 -->
     <aside class="w-56 flex-shrink-0 flex flex-col border-r" :style="sidebarStyle">
       <!-- Logo -->
@@ -77,10 +60,18 @@
         <router-link to="/guide" class="nav-item" :class="{ active: $route.path === '/guide' }">
           <BookOpen :size="15" /><span>使用说明</span>
         </router-link>
+        <router-link v-if="isAdmin" to="/users" class="nav-item" :class="{ active: $route.path === '/users' }">
+          <Shield :size="15" /><span>用户管理</span>
+        </router-link>
       </nav>
 
-      <!-- 底部：主题切换 + 状态 -->
+      <!-- 底部：用户信息 + 主题切换 + 状态 -->
       <div class="p-3 border-t flex flex-col gap-2" :style="`border-color:var(--border)`">
+        <!-- 当前用户 + 退出 -->
+        <div v-if="currentUsername" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs" :style="`background:var(--bg-base); border:1px solid var(--border)`">
+          <span style="color:var(--text-muted)">{{ currentUsername }}</span>
+          <button class="logout-btn" @click="handleLogout">退出</button>
+        </div>
         <!-- 主题切换 -->
         <button
           class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition-all"
@@ -121,18 +112,18 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { LayoutDashboard, Users, Image, CalendarDays, ScrollText, BookOpen, BarChart2, ListChecks, UserCog, MessageSquare, Zap, Monitor } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { LayoutDashboard, Users, Image, CalendarDays, ScrollText, BookOpen, BarChart2, ListChecks, UserCog, MessageSquare, Zap, Monitor, Shield } from 'lucide-vue-next'
 import axios from 'axios'
 import dayjs from 'dayjs'
-import { getAccessToken, setAccessToken } from '@/api'
+import { clearAuth, authApi, getAccessToken } from '@/api'
 
 const route = useRoute()
+const router = useRouter()
 const backendOnline = ref(false)
 const isLight = ref(localStorage.getItem('theme') === 'light')
-const needsPassword = ref(false)
-const passwordInput = ref('')
-const passwordError = ref('')
+const currentUsername = ref(localStorage.getItem('sm_username') || '')
+const isAdmin = ref(localStorage.getItem('sm_is_admin') === '1')
 
 const sidebarStyle = computed(() =>
   isLight.value
@@ -145,19 +136,11 @@ function toggleTheme() {
   localStorage.setItem('theme', isLight.value ? 'light' : 'dark')
 }
 
-async function submitPassword() {
-  setAccessToken(passwordInput.value)
-  try {
-    await axios.get('/api/v1/accounts/?limit=1', {
-      headers: { 'X-Access-Token': passwordInput.value },
-    })
-    needsPassword.value = false
-    passwordError.value = ''
-    backendOnline.value = true
-  } catch {
-    passwordError.value = '密码错误'
-    setAccessToken('')
-  }
+function handleLogout() {
+  clearAuth()
+  currentUsername.value = ''
+  isAdmin.value = false
+  router.push('/login')
 }
 
 const pageMeta: Record<string, { title: string; desc: string }> = {
@@ -174,6 +157,7 @@ const pageMeta: Record<string, { title: string; desc: string }> = {
   '/traffic': { title: '自动截流', desc: '通过话题/对标账号自动互动引流' },
   '/logs': { title: '发布日志', desc: '每次发布的详细操作记录' },
   '/guide': { title: '使用说明', desc: '完整操作手册与 FAQ' },
+  '/users': { title: '用户管理', desc: '管理系统用户和权限' },
 }
 
 const pageTitle = computed(() => pageMeta[route.path]?.title || 'Mayrichbe Manager')
@@ -182,15 +166,24 @@ const currentDate = computed(() => dayjs().format('YYYY年M月D日'))
 
 onMounted(async () => {
   try {
-    const token = getAccessToken()
-    const headers = token ? { 'X-Access-Token': token } : {}
-    const resp = await axios.get('/api/v1/accounts/?limit=1', { timeout: 4000, headers })
+    await axios.get('/health', { timeout: 4000 })
     backendOnline.value = true
-  } catch (e: any) {
-    if (e?.response?.status === 401) {
-      needsPassword.value = true
-    } else {
-      backendOnline.value = false
+  } catch {
+    backendOnline.value = false
+  }
+  // 刷新时同步用户名
+  currentUsername.value = localStorage.getItem('sm_username') || ''
+  isAdmin.value = localStorage.getItem('sm_is_admin') === '1'
+  // 有 token 时调 /auth/me 同步最新用户信息（admin 状态可能被后台修改）
+  if (getAccessToken()) {
+    try {
+      const me: any = await authApi.me()
+      currentUsername.value = me.username
+      isAdmin.value = me.is_admin
+      localStorage.setItem('sm_username', me.username)
+      localStorage.setItem('sm_is_admin', me.is_admin ? '1' : '0')
+    } catch {
+      // token 失效会被 interceptor 处理
     }
   }
 })
@@ -204,5 +197,19 @@ onMounted(async () => {
   text-transform: uppercase;
   padding: 4px 12px 2px;
   color: var(--text-faint);
+}
+.logout-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.logout-btn:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
 }
 </style>

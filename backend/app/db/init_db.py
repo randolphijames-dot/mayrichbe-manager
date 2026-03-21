@@ -1,6 +1,6 @@
-"""数据库初始化：建表 + 安全迁移新列"""
+"""数据库初始化：建表 + 安全迁移新列 + 种子用户"""
 from app.db.base import Base
-from app.db.session import engine
+from app.db.session import engine, SessionLocal
 
 # 导入所有 model 确保 Base 能发现它们
 from app.models.account import Account  # noqa
@@ -9,15 +9,18 @@ from app.models.task import PublishTask  # noqa
 from app.models.log import PublishLog  # noqa
 from app.models.oauth_state import OAuthState  # noqa
 from app.models.post_metric import PostMetricSnapshot  # noqa
+from app.models.user import User  # noqa
 
 
 def init_db() -> None:
     """
     创建所有表（全新数据库）。
     如果表已存在，执行安全迁移（只增列，不删列）。
+    最后确保至少有一个 admin 用户（从环境变量种子创建）。
     """
     Base.metadata.create_all(bind=engine)
     _safe_migrate()
+    _seed_admin_user()
 
 
 def _safe_migrate() -> None:
@@ -32,6 +35,7 @@ def _safe_migrate() -> None:
         ("accounts", "browser_profile_id", "VARCHAR(200)"),
         ("accounts", "ins_password_encrypted", "TEXT"),
         ("accounts", "ins_totp_secret_encrypted", "TEXT"),
+        ("accounts", "ins_session_id_encrypted", "TEXT"),
         ("materials", "folder_tag", "VARCHAR(50)"),
     ]
 
@@ -52,3 +56,40 @@ def _safe_migrate() -> None:
                     print(f"[Migration] 新增列: {table}.{col}")
             except Exception as e:
                 print(f"[Migration] 跳过 {table}.{col}: {e}")
+
+
+def _seed_admin_user() -> None:
+    """
+    首次启动：如果 users 表为空，从环境变量 ACCESS_USERNAME / ACCESS_PASSWORD
+    创建初始 admin 用户。之后所有用户管理通过数据库和 UI 完成。
+    """
+    from app.core.config import settings
+    from app.core.security import hash_password
+
+    db = SessionLocal()
+    try:
+        user_count = db.query(User).count()
+        if user_count > 0:
+            return  # 已有用户，跳过
+
+        username = settings.ACCESS_USERNAME or "admin"
+        password = settings.ACCESS_PASSWORD
+        if not password:
+            print("[Seed] 未设置 ACCESS_PASSWORD，跳过创建种子用户")
+            return
+
+        admin = User(
+            username=username,
+            password_hash=hash_password(password),
+            display_name=username,
+            is_admin=True,
+            is_active=True,
+        )
+        db.add(admin)
+        db.commit()
+        print(f"[Seed] 已创建管理员用户: {username}")
+    except Exception as e:
+        db.rollback()
+        print(f"[Seed] 创建种子用户失败: {e}")
+    finally:
+        db.close()

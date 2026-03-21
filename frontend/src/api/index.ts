@@ -1,9 +1,14 @@
 import axios from 'axios'
 
-// 访问密码（从 localStorage 读取，设置后每次请求自动带上）
+// 访问令牌（从 localStorage 读取，设置后每次请求自动带上）
 const ACCESS_TOKEN_KEY = 'sm_access_token'
 export function getAccessToken() { return localStorage.getItem(ACCESS_TOKEN_KEY) || '' }
 export function setAccessToken(token: string) { localStorage.setItem(ACCESS_TOKEN_KEY, token) }
+export function clearAuth() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY)
+  localStorage.removeItem('sm_username')
+  localStorage.removeItem('sm_is_admin')
+}
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -43,6 +48,15 @@ function humanizeError(raw: string): string {
 api.interceptors.response.use(
   (res) => res.data,
   (err) => {
+    // 401 未授权：清除 token，跳转登录页
+    if (err.response?.status === 401) {
+      clearAuth()
+      const currentPath = window.location.pathname
+      if (currentPath !== '/login') {
+        window.location.href = '/login?redirect=' + encodeURIComponent(currentPath)
+      }
+      return Promise.reject(err)
+    }
     const raw = err.response?.data?.detail || err.message || '请求失败'
     const friendly = humanizeError(raw)
     console.error('[API Error]', raw)
@@ -136,6 +150,23 @@ export const analyticsApi = {
   refresh: (params?: { days?: number; limit?: number }) => api.post('/analytics/refresh', null, { params }),
   summary: (params?: { days?: number }) => api.get('/analytics/summary', { params }),
   dailyRanking: (params?: { target_date?: string; limit?: number }) => api.get('/analytics/daily-ranking', { params }),
+}
+
+// 认证
+export const authApi = {
+  check: () => api.get('/auth/check'),
+  login: (data: { username?: string; password: string }) => api.post('/auth/login', data),
+  me: () => api.get('/auth/me'),
+}
+
+// 用户管理
+export const usersApi = {
+  list: () => api.get('/users/'),
+  create: (data: { username: string; password: string; display_name?: string; is_admin?: boolean }) =>
+    api.post('/users/', data),
+  update: (id: number, data: { password?: string; display_name?: string; is_admin?: boolean; is_active?: boolean }) =>
+    api.patch(`/users/${id}`, data),
+  delete: (id: number) => api.delete(`/users/${id}`),
 }
 
 export default api

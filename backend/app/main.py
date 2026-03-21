@@ -100,18 +100,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 访问密码中间件（可选，设置 ACCESS_PASSWORD 后启用）
+# 访问控制中间件：解析 JWT → 写入 request.state.user
 @app.middleware("http")
 async def access_guard(request, call_next):
     from fastapi.responses import JSONResponse
-    password = settings.ACCESS_PASSWORD
-    if password and request.url.path.startswith("/api/"):
+    from app.api.v1.endpoints.auth import verify_request_token
+
+    # 初始化 request.state.user 为空
+    request.state.user = None
+
+    if request.url.path.startswith("/api/"):
+        # 放行认证端点（登录和检查不需要 token）
+        if request.url.path in ("/api/v1/auth/login", "/api/v1/auth/check"):
+            return await call_next(request)
+
         token = (
             request.headers.get("X-Access-Token")
             or request.query_params.get("token")
         )
-        if token != password:
-            return JSONResponse({"detail": "未授权，需要访问密码"}, status_code=401)
+        payload = verify_request_token(token) if token else None
+
+        if not payload:
+            return JSONResponse({"detail": "未授权，请重新登录"}, status_code=401)
+
+        # 将用户信息写入 request.state，后续端点可通过 request.state.user 获取
+        request.state.user = payload
+
     return await call_next(request)
 
 # health check（必须在静态文件 mount 之前注册）
