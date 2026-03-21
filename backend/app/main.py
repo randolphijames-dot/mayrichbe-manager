@@ -105,7 +105,7 @@ app.add_middleware(
 async def access_guard(request, call_next):
     from fastapi.responses import JSONResponse
     password = settings.ACCESS_PASSWORD
-    if password and not request.url.path.startswith("/health"):
+    if password and request.url.path.startswith("/api/"):
         token = (
             request.headers.get("X-Access-Token")
             or request.query_params.get("token")
