@@ -81,6 +81,18 @@ def start_scheduler(database_url: str):
         replace_existing=True,
         next_run_time=datetime.now(_scheduler.timezone) + timedelta(minutes=3),
     )
+
+    # 每日自动养号：东京时间 08:30 触发（账号活跃高峰前暖机）
+    _scheduler.add_job(
+        _daily_warmup_job,
+        trigger="cron",
+        hour=8,
+        minute=30,
+        id="daily_warmup_0830",
+        name="每日自动养号（08:30 JST）",
+        replace_existing=True,
+    )
+
     logger.info("[Scheduler] APScheduler 已启动")
     return _scheduler
 
@@ -318,3 +330,14 @@ def _collect_post_metrics_job():
         logger.warning(f"[Analytics] 采集失败: {exc}")
     finally:
         db.close()
+
+
+def _daily_warmup_job():
+    """每日 08:30 自动养号（所有活跃 Instagram 账号）"""
+    from app.tasks.warmup import batch_warmup
+
+    logger.info("[Scheduler] 每日自动养号开始触发...")
+    try:
+        batch_warmup(account_ids=None)  # None = 查所有活跃 Instagram 账号
+    except Exception as exc:
+        logger.error(f"[Scheduler] 每日自动养号失败: {exc}")

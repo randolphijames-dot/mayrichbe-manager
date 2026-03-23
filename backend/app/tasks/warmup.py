@@ -112,6 +112,23 @@ def _warmup_instagrapi(account):
                 # 模拟观看时长
                 time.sleep(random.uniform(3, 8) * len(user_stories[:3]))
 
+        # 4. 搜索财经类 hashtag，浏览并点赞（让 Instagram 算法知道账号是财经方向）
+        finance_hashtags = ["日経平均", "株式投資", "資産形成", "FX投資", "経済ニュース", "投資初心者", "NISA", "iDeCo", "お金の勉強", "節約術"]
+        tag = random.choice(finance_hashtags)
+        logger.info(f"[{account.username}] 浏览财经话题 #{tag}...")
+        try:
+            tag_medias = cl.hashtag_medias_recent(tag, amount=10)
+            time.sleep(random.uniform(3, 7))
+            if tag_medias:
+                # 随机点赞 1 个财经帖子
+                for item in random.sample(tag_medias, min(1, len(tag_medias))):
+                    if not item.has_liked:
+                        cl.media_like(item.id)
+                        logger.info(f"[{account.username}] 点赞了财经帖子 #{tag}: {item.code}")
+                        time.sleep(random.uniform(5, 12))
+        except Exception as e:
+            logger.warning(f"[{account.username}] 财经话题浏览失败（跳过）: {e}")
+
         logger.info(f"养号完成 (instagrapi): {account.username}")
 
     except Exception as e:
@@ -168,6 +185,15 @@ def _warmup_browser(account, browser_type):
                 for _ in range(random.randint(2, 5)):
                     await human_scroll(page, "down", random.randint(300, 600))
                     await human_delay(5000, 15000)  # 模拟认真看视频
+
+                # 4. 浏览财经类 hashtag 页面（让算法识别账号方向）
+                finance_hashtags = ["日経平均", "株式投資", "資産形成", "FX投資", "NISA", "投資初心者", "お金の勉強"]
+                tag = random.choice(finance_hashtags)
+                logger.info(f"[{account.username}] 浏览财经话题页 #{tag}...")
+                await page.goto(f"https://www.instagram.com/explore/tags/{tag}/", wait_until="domcontentloaded")
+                await human_delay(3000, 6000)
+                await human_scroll(page, "down", random.randint(300, 500))
+                await human_delay(3000, 7000)
 
                 logger.info(f"养号完成 (Browser): {account.username}")
 
