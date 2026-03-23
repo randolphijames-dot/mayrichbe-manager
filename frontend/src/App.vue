@@ -66,6 +66,15 @@
           <span>{{ isLight ? '🌙 深色模式' : '☀️ 亮色模式' }}</span>
           <span class="opacity-60">切换</span>
         </button>
+        <!-- 时区切换 -->
+        <button
+          class="flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition-all"
+          :style="`background:var(--bg-base); border:1px solid var(--border); color:var(--text-muted)`"
+          @click="toggleTimezone"
+        >
+          <span>{{ tzOffset === 9 ? '🕘 +9 東京時間' : '🕗 +8 北京时间' }}</span>
+          <span class="opacity-60">切换</span>
+        </button>
         <!-- API 状态 -->
         <div class="flex items-center gap-2 px-1">
           <div class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"></div>
@@ -101,11 +110,18 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { clearAuth, authApi, getAccessToken } from '@/api'
+import { getTzOffset, setTzOffset } from '@/composables/timezone'
 
 const route = useRoute()
 const router = useRouter()
 const backendOnline = ref(false)
 const isLight = ref(localStorage.getItem('theme') === 'light')
+const tzOffset = ref(getTzOffset())
+function toggleTimezone() {
+  const next = tzOffset.value === 9 ? 8 : 9
+  tzOffset.value = next
+  setTzOffset(next)
+}
 const currentUsername = ref(localStorage.getItem('sm_username') || '')
 const isAdmin = ref(localStorage.getItem('sm_is_admin') === '1')
 

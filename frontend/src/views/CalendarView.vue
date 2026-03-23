@@ -120,7 +120,7 @@
                   @click="selectTask(task)"
                 >
                   <div class="flex items-center justify-between gap-1">
-                    <span>{{ dayjs(task.scheduled_at + 'Z').format('HH:mm') }}</span>
+                    <span>{{ dayjs(task.scheduled_at).add(getTzOffset() - 8, 'hour').format('HH:mm') }}</span>
                     <span>{{ getStatusEmoji(task.status) }}</span>
                   </div>
                 </div>
@@ -161,7 +161,7 @@
               <span class="badge" :class="getPlatformBadge(task.account_id)">账号 #{{ task.account_id }}</span>
               <span class="text-xs" style="color:var(--text-muted)">素材 #{{ task.material_id }}</span>
             </div>
-            <span class="text-xs" style="color:var(--text-faint)">{{ dayjs(task.scheduled_at + 'Z').format('HH:mm') }}</span>
+            <span class="text-xs" style="color:var(--text-faint)">{{ dayjs(task.scheduled_at).add(getTzOffset() - 8, 'hour').format('HH:mm') }}</span>
           </div>
           <span class="badge" :class="getStatusBadge(task.status)">{{ getStatusLabel(task.status) }}</span>
         </div>
@@ -175,6 +175,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-vue-next'
 import { tasksApi, accountsApi } from '@/api'
 import dayjs from 'dayjs'
+import { fmtScheduled, getTzOffset } from '@/composables/timezone'
 
 const tasks = ref<any[]>([])
 const accounts = ref<any[]>([])
@@ -258,7 +259,7 @@ const calendarCells = computed(() => {
   // 当月天数
   for (let d = start; d.isBefore(end) || d.isSame(end, 'day'); d = d.add(1, 'day')) {
     const dateStr = d.format('YYYY-MM-DD')
-    const dayTasks = tasks.value.filter(t => dayjs(t.scheduled_at + 'Z').format('YYYY-MM-DD') === dateStr)
+    const dayTasks = tasks.value.filter(t => dayjs(t.scheduled_at).add(getTzOffset() - 8, 'hour').format('YYYY-MM-DD') === dateStr)
     cells.push({ key: dateStr, day: d.date(), inMonth: true, isToday: d.isSame(dayjs(), 'day'), date: dateStr, tasks: dayTasks })
   }
 
@@ -293,14 +294,14 @@ function selectDay(cell: any) { selectedDay.value = cell }
 // 获取某个账号在某个日期的所有任务
 function getTasksForAccountDate(accountId: number, dateStr: string) {
   return tasks.value.filter(t => {
-    return t.account_id === accountId && dayjs(t.scheduled_at + 'Z').format('YYYY-MM-DD') === dateStr
+    return t.account_id === accountId && dayjs(t.scheduled_at).add(getTzOffset() - 8, 'hour').format('YYYY-MM-DD') === dateStr
   }).sort((a, b) => dayjs(a.scheduled_at).diff(dayjs(b.scheduled_at)))
 }
 
 // 选中任务（可以后续扩展为弹窗编辑）
 function selectTask(task: any) {
   selectedTask.value = task
-  alert(`任务详情：\n账号ID: ${task.account_id}\n素材ID: ${task.material_id}\n时间: ${dayjs(task.scheduled_at + 'Z').format('YYYY-MM-DD HH:mm')}\n状态: ${getStatusLabel(task.status)}`)
+  alert(`任务详情：\n账号ID: ${task.account_id}\n素材ID: ${task.material_id}\n时间: ${dayjs(task.scheduled_at).add(getTzOffset() - 8, 'hour').format('YYYY-MM-DD HH:mm')}\n状态: ${getStatusLabel(task.status)}`)
 }
 
 // 为某个账号在某个日期创建新任务（占位功能）
@@ -314,7 +315,7 @@ function taskColor(status: string) {
 }
 function formatTaskLabel(task: any) {
   const a = accountMap.value[task.account_id]
-  return `${a?.platform === 'instagram' ? '📸' : '▶'} ${dayjs(task.scheduled_at + 'Z').format('HH:mm')}`
+  return `${a?.platform === 'instagram' ? '📸' : '▶'} ${dayjs(task.scheduled_at).add(getTzOffset() - 8, 'hour').format('HH:mm')}`
 }
 function getPlatformBadge(id: number) {
   return accountMap.value[id]?.platform === 'instagram' ? 'badge-pink' : 'badge-red'

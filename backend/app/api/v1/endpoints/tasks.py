@@ -118,15 +118,26 @@ def update_task(task_id: int, payload: TaskUpdate, request: Request, db: Session
     """更新任务（只允许 PENDING 状态的任务修改）"""
     user = get_current_user(request)
     task = verify_ownership(db, PublishTask, task_id, user)
-    if task.status not in (TaskStatus.PENDING, TaskStatus.FAILED):
-        raise HTTPException(status_code=400, detail="只有 pending/failed 状态的任务可以修改")
+    if task.status not in (TaskStatus.PENDING, TaskStatus.QUEUED, TaskStatus.FAILED):
+        raise HTTPException(status_code=400, detail="只有 pending/queued/failed 状态的任务可以修改")
 
     update_data = payload.model_dump(exclude_unset=True)
     for k, v in update_data.items():
         setattr(task, k, v)
 
+    # 如果修改了 scheduled_at 且任务是 QUEUED/PENDING，取消旧 job 并重新调度
+    needs_reschedule = 'scheduled_at' in update_data and task.status in (TaskStatus.PENDING, TaskStatus.QUEUED)
+    if needs_reschedule:
+        from app.scheduler import cancel_task as _cancel_job
+        _cancel_job(task.id)
+        task.status = TaskStatus.PENDING
+
     db.commit()
     db.refresh(task)
+
+    if needs_reschedule:
+        _schedule_task(task, db)
+
     return task
 
 

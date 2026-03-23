@@ -84,6 +84,11 @@
             <td>
               <div class="flex gap-1">
                 <button
+                  v-if="['pending','queued'].includes(task.status)"
+                  class="btn btn-secondary btn-sm"
+                  @click="openEditTask(task)"
+                >编辑</button>
+                <button
                   v-if="['pending','queued','running'].includes(task.status)"
                   class="btn btn-ghost btn-sm"
                   @click="handleCancel(task.id)"
@@ -102,12 +107,49 @@
       </table>
     </div>
   </div>
+  <!-- 编辑任务 Modal -->
+  <Teleport to="body">
+    <div v-if="editingTask" class="fixed inset-0 z-50 flex items-center justify-center" style="background:var(--modal-overlay)">
+      <div class="card" style="max-width:480px; width:100%">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold" style="color:var(--text-primary)">编辑任务 #{{ editingTask.id }}</h3>
+          <button @click="editingTask = null" style="color:var(--text-faint)"><X :size="18" /></button>
+        </div>
+        <div class="flex flex-col gap-3">
+          <div>
+            <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">发布时间</label>
+            <input v-model="editForm.scheduled_at" type="datetime-local" class="input text-sm" />
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">素材</label>
+            <select v-model="editForm.material_id" class="input text-sm">
+              <option v-for="m in materials" :key="m.id" :value="m.id">
+                #{{ m.id }} {{ m.title || '素材' }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">备注</label>
+            <input v-model="editForm.notes" class="input text-sm" placeholder="可选备注" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button class="btn btn-ghost" @click="editingTask = null">取消</button>
+          <button class="btn btn-primary" @click="handleEditSave" :disabled="editSaving">
+            <span v-if="editSaving" class="w-4 h-4 border-2 rounded-full animate-spin" style="border-color:rgba(255,255,255,0.3); border-top-color:white"></span>
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { RefreshCw, CalendarDays } from 'lucide-vue-next'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { RefreshCw, CalendarDays, X } from 'lucide-vue-next'
 import { tasksApi, accountsApi, materialsApi } from '@/api'
+import { toBackendScheduled, fmtScheduled } from '@/composables/timezone'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
@@ -116,6 +158,9 @@ const accounts = ref<any[]>([])
 const materials = ref<any[]>([])
 const filterStatus = ref('')
 const filterAccountId = ref('')
+const editingTask = ref<any>(null)
+const editForm = reactive({ scheduled_at: '', notes: '', material_id: 0 })
+const editSaving = ref(false)
 
 const accountMap = computed(() => {
   const m: Record<number, any> = {}
@@ -152,7 +197,7 @@ const failCount = computed(() => filteredTasks.value.filter(t => t.status === 'f
 function getPlatformBadge(accountId: number) {
   return accountMap.value[accountId]?.platform === 'instagram' ? 'badge-pink' : 'badge-red'
 }
-function formatDate(d: string) { return dayjs(d + 'Z').format('MM-DD HH:mm') }
+function formatDate(d: string) { return fmtScheduled(d) }
 function isOverdue(task: any) { return task.status === 'pending' && dayjs(task.scheduled_at).isBefore(dayjs()) }
 function statusLabel(s: string) {
   return { pending: '等待', queued: '排队', running: '执行中', success: '成功', failed: '失败', retrying: '重试中', cancelled: '已取消' }[s] || s
@@ -168,6 +213,35 @@ async function loadTasks() {
   loading.value = true
   try { tasks.value = await tasksApi.list({ limit: 500 }) as any[] }
   finally { loading.value = false }
+}
+
+function openEditTask(task: any) {
+  editingTask.value = task
+  // 显示时需要把存储的时间转回用户时区显示
+  // scheduled_at 按后端+8时间存储，这里直接用 dayjs 加回去
+  const adj = (Number(localStorage.getItem('sm_tz_offset') || 9)) - 8
+  const displayTime = dayjs(task.scheduled_at).add(adj, 'hour').format('YYYY-MM-DDTHH:mm')
+  editForm.scheduled_at = displayTime
+  editForm.notes = task.notes || ''
+  editForm.material_id = task.material_id
+}
+
+async function handleEditSave() {
+  if (!editingTask.value) return
+  editSaving.value = true
+  try {
+    const adj = (Number(localStorage.getItem('sm_tz_offset') || 9)) - 8
+    const backendTime = dayjs(editForm.scheduled_at).subtract(adj, 'hour').format('YYYY-MM-DDTHH:mm') + ':00'
+    await tasksApi.update(editingTask.value.id, {
+      scheduled_at: backendTime,
+      notes: editForm.notes || null,
+      material_id: editForm.material_id || undefined,
+    })
+    editingTask.value = null
+    await loadTasks()
+  } finally {
+    editSaving.value = false
+  }
 }
 
 async function handleCancel(id: number) {

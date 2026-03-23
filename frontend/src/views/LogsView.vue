@@ -79,7 +79,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { RefreshCw, ScrollText, X } from 'lucide-vue-next'
 import { logsApi } from '@/api'
-import dayjs from 'dayjs'
+import { fmtUtc } from '@/composables/timezone'
 
 const loading = ref(false)
 const logs = ref<any[]>([])
@@ -91,7 +91,7 @@ function levelBadge(l: string) {
   return { success: 'badge-green', error: 'badge-red', warning: 'badge-yellow', info: 'badge-blue' }[l] || 'badge-gray'
 }
 function formatDate(d: string) {
-  return dayjs(d + 'Z').format('MM-DD HH:mm:ss')
+  return fmtUtc(d, 'MM-DD HH:mm:ss')
 }
 function showDetail(log: any) { detailLog.value = log }
 

@@ -923,6 +923,7 @@ import { ref, computed, reactive, onMounted } from 'vue'
 import { Upload, RefreshCw, X, Users, Zap, Trash2, Layers, FolderOpen, CheckSquare, ImageIcon, Move, Pencil } from 'lucide-vue-next'
 import { materialsApi, accountsApi, tasksApi, showToast } from '@/api'
 import dayjs from 'dayjs'
+import { toBackendScheduled } from '@/composables/timezone'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 dayjs.extend(relativeTime)
@@ -1033,7 +1034,7 @@ async function submitBatchPublish() {
 
   creatingTask.value = true
   try {
-    const scheduledLocal = batchPublishForm.scheduled_at + ':00'
+    const scheduledLocal = toBackendScheduled(batchPublishForm.scheduled_at) + ':00'
     let totalTasks = 0
 
     if (batchPublishForm.match_mode === 'all') {
@@ -1369,7 +1370,7 @@ async function submitTask() {
 
     // 只有定时发布模式才传 scheduled_at
     if (!taskForm.instant) {
-      payload.scheduled_at = taskForm.scheduled_at + ':00'
+      payload.scheduled_at = toBackendScheduled(taskForm.scheduled_at) + ':00'
     }
 
     await tasksApi.createBatch(payload)

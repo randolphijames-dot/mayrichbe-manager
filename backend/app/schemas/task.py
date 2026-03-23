@@ -29,6 +29,7 @@ class TaskUpdate(BaseModel):
     random_offset_minutes: Optional[int] = None
     notes: Optional[str] = None
     is_draft: Optional[bool] = None
+    material_id: Optional[int] = None
 
 
 class TaskOut(BaseModel):

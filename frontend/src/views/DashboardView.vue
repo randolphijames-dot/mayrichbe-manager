@@ -203,6 +203,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Users, Image, Clock, CheckCircle, CalendarDays, ScrollText } from 'lucide-vue-next'
 import { accountsApi, materialsApi, tasksApi, logsApi } from '@/api'
+import { fmtScheduled } from '@/composables/timezone'
 import dayjs from 'dayjs'
 import isToday from 'dayjs/plugin/isToday'
 dayjs.extend(isToday)
@@ -256,7 +257,7 @@ const upcomingTasks = computed(() =>
     .slice(0, 6)
 )
 
-function formatDate(d: string) { return dayjs(d + 'Z').format('MM-DD HH:mm') }
+function formatDate(d: string) { return fmtScheduled(d) }
 
 function getPlatformLabel(accountId: number) {
   const a = accountMap.value[accountId]

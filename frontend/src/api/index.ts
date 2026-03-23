@@ -112,6 +112,7 @@ export const tasksApi = {
   createBatch: (data: object) => api.post('/tasks/batch', data),
   cancel: (id: number) => api.post(`/tasks/${id}/cancel`),
   retry: (id: number) => api.post(`/tasks/${id}/retry`),
+  update: (id: number, data: object) => api.patch(`/tasks/${id}`, data),
 }
 
 // 日志
