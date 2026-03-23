@@ -210,17 +210,21 @@ def update_material(material_id: int, payload: MaterialUpdate, request: Request,
 @router.delete("/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_material(material_id: int, request: Request, db: Session = Depends(get_db)):
     """删除素材（同时删除本地文件）"""
-    from app.models.task import PublishTask
+    from app.models.task import PublishTask, TaskStatus
 
     user = get_current_user(request)
     material = verify_ownership(db, Material, material_id, user)
 
-    # 检查是否有发布任务引用此素材
-    linked_tasks = db.query(PublishTask).filter(PublishTask.material_id == material_id).count()
+    # 只有「进行中」的任务才阻止删除（已取消/成功/失败的不算）
+    active_statuses = [TaskStatus.PENDING, TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.RETRYING]
+    linked_tasks = db.query(PublishTask).filter(
+        PublishTask.material_id == material_id,
+        PublishTask.status.in_(active_statuses)
+    ).count()
     if linked_tasks > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"无法删除：此素材被 {linked_tasks} 个发布任务引用。请先删除相关任务或取消任务关联。"
+            detail=f"无法删除：此素材有 {linked_tasks} 个进行中的任务，请先取消再删除。"
         )
 
     # 删除物理文件（原文件）
