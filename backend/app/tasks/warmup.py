@@ -68,13 +68,13 @@ def warmup_account(account_id: int):
 
 
 def _warmup_instagrapi(account):
-    """使用 instagrapi 模拟手机刷 Feed 和随机点赞"""
+    """使用 instagrapi 模拟手机真实使用行为（约 15-20 分钟）"""
     from app.services.instagrapi_publisher import _get_client
     from app.core.encryption import safe_decrypt
 
     password = safe_decrypt(account.ins_password_encrypted)
     totp = safe_decrypt(account.ins_totp_secret_encrypted) if account.ins_totp_secret_encrypted else None
-    
+
     if not password:
         logger.warning(f"账号 {account.username} 未保存密码，无法执行 instagrapi 养号")
         return
@@ -82,54 +82,97 @@ def _warmup_instagrapi(account):
     logger.info(f"开始养号 (instagrapi): {account.username}")
     cl = _get_client(account.id, account.username, password, account.proxy, totp)
 
-    try:
-        # 1. 刷主页 Feed 流
-        logger.info(f"[{account.username}] 正在刷主页 Feed...")
-        feed_items = cl.timeline_feed()
-        time.sleep(random.uniform(3, 8))
+    # 财经 hashtag 池
+    finance_hashtags = [
+        "日経平均", "株式投資", "資産形成", "FX投資", "経済ニュース",
+        "投資初心者", "NISA", "iDeCo", "お金の勉強", "節約術",
+        "インデックス投資", "高配当株", "仮想通貨", "不動産投資", "副業",
+    ]
+    liked_total = 0  # 全程累计点赞数，控制在 4 个以内
 
-        # 随机给 1-2 个 Feed 帖子点赞
-        if feed_items:
-            like_count = random.randint(1, 2)
-            for item in random.sample(feed_items, min(like_count, len(feed_items))):
-                if not item.has_liked:
+    try:
+        # ── 第 1 轮：刷主页 Feed ──────────────────────────
+        logger.info(f"[{account.username}] 第1轮：刷主页 Feed...")
+        feed_items = cl.timeline_feed()
+        # 模拟慢慢向下刷，偶尔停下来"读帖子"
+        time.sleep(random.uniform(8, 20))
+
+        if feed_items and liked_total < 4:
+            # 随机给 1-2 个帖子点赞，点赞前先"看一会儿"
+            for item in random.sample(feed_items, min(2, len(feed_items))):
+                if not item.has_liked and liked_total < 4:
+                    time.sleep(random.uniform(15, 45))  # 模拟阅读帖子内容
                     cl.media_like(item.id)
-                    logger.info(f"[{account.username}] 点赞了帖子 {item.code}")
+                    liked_total += 1
+                    logger.info(f"[{account.username}] 点赞帖子 {item.code}（共 {liked_total} 个）")
                     time.sleep(random.uniform(5, 15))
 
-        # 2. 刷 Explore (发现页)
-        logger.info(f"[{account.username}] 正在刷 Explore 页...")
-        explore_items = cl.explore()
-        time.sleep(random.uniform(5, 10))
-
-        # 3. 随机看一个用户的 Story
+        # 随机看一两条评论（read-only，低风险，模拟看评论区）
         if feed_items:
-            # 找一个发了帖子的用户，看看他有没有 story
-            target_user = random.choice(feed_items).user
-            user_stories = cl.user_stories(target_user.pk)
-            if user_stories:
-                logger.info(f"[{account.username}] 观看了 {target_user.username} 的 Story")
-                # 模拟观看时长
-                time.sleep(random.uniform(3, 8) * len(user_stories[:3]))
+            pick = random.choice(feed_items[:5])
+            try:
+                cl.media_comments(pick.id, amount=5)
+                logger.info(f"[{account.username}] 看了帖子 {pick.code} 的评论")
+                time.sleep(random.uniform(20, 50))  # 模拟读评论
+            except Exception:
+                pass
 
-        # 4. 搜索财经类 hashtag，浏览并点赞（让 Instagram 算法知道账号是财经方向）
-        finance_hashtags = ["日経平均", "株式投資", "資産形成", "FX投資", "経済ニュース", "投資初心者", "NISA", "iDeCo", "お金の勉強", "節約術"]
-        tag = random.choice(finance_hashtags)
-        logger.info(f"[{account.username}] 浏览财经话题 #{tag}...")
+        # ── 第 2 轮：浏览财经 Hashtag × 2 个 ───────────────
+        selected_tags = random.sample(finance_hashtags, 2)
+        for tag in selected_tags:
+            logger.info(f"[{account.username}] 浏览财经话题 #{tag}...")
+            try:
+                tag_medias = cl.hashtag_medias_recent(tag, amount=12)
+                time.sleep(random.uniform(10, 25))  # 模拟刚进话题页，扫一眼封面
+
+                if tag_medias:
+                    # 随机打开 1 个帖子"看内容"
+                    pick = random.choice(tag_medias[:8])
+                    try:
+                        cl.media_comments(pick.id, amount=5)
+                        logger.info(f"[{account.username}] 打开了财经帖子 {pick.code}")
+                        time.sleep(random.uniform(25, 60))  # 模拟认真读财经内容
+                    except Exception:
+                        time.sleep(random.uniform(15, 35))
+
+                    # 概率点赞（50% 概率，上限 4 个）
+                    if liked_total < 4 and random.random() < 0.5:
+                        for item in random.sample(tag_medias, min(1, len(tag_medias))):
+                            if not item.has_liked:
+                                cl.media_like(item.id)
+                                liked_total += 1
+                                logger.info(f"[{account.username}] 点赞财经帖 #{tag}（共 {liked_total} 个）")
+                                time.sleep(random.uniform(8, 20))
+                                break
+            except Exception as e:
+                logger.warning(f"[{account.username}] #{tag} 浏览失败（跳过）: {e}")
+
+            # 话题之间模拟"退回去想想，再刷一会儿"
+            time.sleep(random.uniform(30, 90))
+
+        # ── 第 3 轮：刷 Explore 发现页 ───────────────────
+        logger.info(f"[{account.username}] 第3轮：刷 Explore 发现页...")
         try:
-            tag_medias = cl.hashtag_medias_recent(tag, amount=10)
-            time.sleep(random.uniform(3, 7))
-            if tag_medias:
-                # 随机点赞 1 个财经帖子
-                for item in random.sample(tag_medias, min(1, len(tag_medias))):
-                    if not item.has_liked:
-                        cl.media_like(item.id)
-                        logger.info(f"[{account.username}] 点赞了财经帖子 #{tag}: {item.code}")
-                        time.sleep(random.uniform(5, 12))
-        except Exception as e:
-            logger.warning(f"[{account.username}] 财经话题浏览失败（跳过）: {e}")
+            cl.explore()
+            time.sleep(random.uniform(20, 50))
+        except Exception:
+            pass
 
-        logger.info(f"养号完成 (instagrapi): {account.username}")
+        # ── 第 4 轮：看 Story ─────────────────────────────
+        if feed_items:
+            target_user = random.choice(feed_items[:8]).user
+            try:
+                user_stories = cl.user_stories(target_user.pk)
+                if user_stories:
+                    story_watch = random.uniform(4, 10) * len(user_stories[:5])
+                    logger.info(f"[{account.username}] 看了 {target_user.username} 的 Story（约 {int(story_watch)}s）")
+                    time.sleep(story_watch)
+            except Exception:
+                pass
+
+        # ── 收尾：模拟放下手机前最后一次刷 Feed ─────────────
+        time.sleep(random.uniform(15, 40))
+        logger.info(f"养号完成 (instagrapi): {account.username}，共点赞 {liked_total} 个")
 
     except Exception as e:
         logger.error(f"[{account.username}] instagrapi 养号异常: {e}")
@@ -179,21 +222,51 @@ def _warmup_browser(account, browser_type):
                     except:
                         pass
 
-                # 3. 随机查看 Reels（停留 5-15 秒）
+                # 3. 刷 Reels（5-10 轮，每轮停留更长，模拟认真看视频）
                 await page.goto("https://www.instagram.com/reels/", wait_until="domcontentloaded")
                 await human_delay(2000, 4000)
-                for _ in range(random.randint(2, 5)):
+                reel_rounds = random.randint(5, 10)
+                for i in range(reel_rounds):
                     await human_scroll(page, "down", random.randint(300, 600))
-                    await human_delay(5000, 15000)  # 模拟认真看视频
+                    watch_time = random.randint(8000, 25000)  # 每个 Reel 看 8-25 秒
+                    await human_delay(watch_time, watch_time + 3000)
+                    # 30% 概率点赞当前 Reel
+                    if random.random() < 0.3:
+                        like_btns = await page.locator('svg[aria-label="Like"], svg[aria-label="いいね！"]').all()
+                        if like_btns:
+                            try:
+                                await like_btns[0].click()
+                                await human_delay(1000, 3000)
+                            except Exception:
+                                pass
 
-                # 4. 浏览财经类 hashtag 页面（让算法识别账号方向）
-                finance_hashtags = ["日経平均", "株式投資", "資産形成", "FX投資", "NISA", "投資初心者", "お金の勉強"]
-                tag = random.choice(finance_hashtags)
-                logger.info(f"[{account.username}] 浏览财经话题页 #{tag}...")
-                await page.goto(f"https://www.instagram.com/explore/tags/{tag}/", wait_until="domcontentloaded")
-                await human_delay(3000, 6000)
-                await human_scroll(page, "down", random.randint(300, 500))
-                await human_delay(3000, 7000)
+                # 4. 浏览 2 个财经 hashtag 页面（各停留 1-3 分钟）
+                finance_hashtags = [
+                    "日経平均", "株式投資", "資産形成", "FX投資", "NISA",
+                    "投資初心者", "お金の勉強", "高配当株", "インデックス投資", "副業",
+                ]
+                for tag in random.sample(finance_hashtags, 2):
+                    logger.info(f"[{account.username}] 浏览财经话题页 #{tag}...")
+                    await page.goto(f"https://www.instagram.com/explore/tags/{tag}/", wait_until="domcontentloaded")
+                    await human_delay(3000, 6000)
+                    # 滚动浏览话题下的帖子
+                    for _ in range(random.randint(3, 6)):
+                        await human_scroll(page, "down", random.randint(200, 400))
+                        await human_delay(4000, 12000)  # 模拟看封面图停留
+
+                    # 随机点开一个帖子看详情（停留 20-50 秒）
+                    posts = await page.locator("article a").all()
+                    if posts:
+                        try:
+                            await random.choice(posts[:6]).click()
+                            await human_delay(20000, 50000)
+                            await page.go_back()
+                            await human_delay(2000, 4000)
+                        except Exception:
+                            pass
+
+                    # 话题之间模拟退出、停顿
+                    await human_delay(15000, 40000)
 
                 logger.info(f"养号完成 (Browser): {account.username}")
 
