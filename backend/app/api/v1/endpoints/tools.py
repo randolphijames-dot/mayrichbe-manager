@@ -89,3 +89,38 @@ def get_settings(request: Request):
         "max_file_size_mb": settings.MAX_FILE_SIZE_MB,
         "default_random_offset_minutes": settings.DEFAULT_RANDOM_OFFSET_MINUTES,
     }
+
+
+@router.get("/warmup/status")
+def get_warmup_status(request: Request, db: Session = Depends(get_db)):
+    """查询最近 24 小时批量养号的执行结果"""
+    from app.models.log import PublishLog
+    from datetime import datetime, timedelta
+
+    user = get_current_user(request)
+
+    # 查最近 24 小时的养号日志
+    since = datetime.utcnow() - timedelta(hours=24)
+    q = db.query(PublishLog).filter(
+        PublishLog.event.in_(["warmup_success", "warmup_error"]),
+        PublishLog.created_at >= since,
+    )
+    q = apply_owner_filter(q, PublishLog, user)
+    logs = q.order_by(PublishLog.created_at.desc()).all()
+
+    if not logs:
+        return {"has_data": False}
+
+    success_count = sum(1 for l in logs if l.event == "warmup_success")
+    error_count = sum(1 for l in logs if l.event == "warmup_error")
+    last_time = logs[0].created_at.isoformat() if logs else None
+
+    failed_accounts = [l.message for l in logs if l.event == "warmup_error"]
+
+    return {
+        "has_data": True,
+        "last_executed_at": last_time,
+        "success_count": success_count,
+        "error_count": error_count,
+        "failed_messages": failed_accounts[:5],  # 最多返回 5 条失败信息
+    }

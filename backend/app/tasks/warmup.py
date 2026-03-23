@@ -10,6 +10,33 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _write_warmup_log(account_id: int, success: bool, message: str, detail: str = None):
+    """写养号日志到 publish_logs 表"""
+    from app.db.session import SessionLocal
+    from app.models.log import PublishLog, LogLevel
+    from app.models.account import Account
+
+    db = SessionLocal()
+    try:
+        account = db.query(Account).filter(Account.id == account_id).first()
+        owner_id = getattr(account, 'owner_id', 1) if account else 1
+        log = PublishLog(
+            owner_id=owner_id,
+            account_id=account_id,
+            task_id=None,
+            level=LogLevel.SUCCESS if success else LogLevel.ERROR,
+            event="warmup_success" if success else "warmup_error",
+            message=message,
+            detail=detail,
+        )
+        db.add(log)
+        db.commit()
+    except Exception:
+        pass  # 写日志失败不影响主流程
+    finally:
+        db.close()
+
+
 def warmup_account(account_id: int):
     """对单个账号执行养号操作"""
     from app.db.session import SessionLocal
@@ -30,8 +57,12 @@ def warmup_account(account_id: int):
             # 指纹浏览器模式养号
             _warmup_browser(account, browser_type)
 
+        _write_warmup_log(account_id, success=True, message=f"养号完成: {account.username}")
+
     except Exception as e:
         logger.error(f"养号失败（{account_id}）: {e}")
+        _account_name = account.username if 'account' in locals() and account else str(account_id)
+        _write_warmup_log(account_id, success=False, message=f"养号失败: {_account_name}", detail=str(e))
     finally:
         db.close()
 
@@ -178,6 +209,14 @@ def batch_warmup(account_ids: list = None):
             # 每个账号间隔 2-5 分钟，避免同时操作
             delay = i * random.randint(120, 300)
             threading.Thread(target=_run_delayed, args=(account.id, delay), daemon=True).start()
+
+        # 通知：养号已触发
+        try:
+            from app.services.notify import _send_all
+            count = len(accounts)
+            _send_all(f"🏃 批量养号已开始：共 {count} 个账号，每账号间隔 2-5 分钟后台执行")
+        except Exception:
+            pass
 
     finally:
         db.close()

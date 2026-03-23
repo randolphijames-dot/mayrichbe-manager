@@ -20,6 +20,7 @@ const router = createRouter({
     { path: '/logs', component: () => import('@/views/LogsView.vue') },
     { path: '/guide', component: () => import('@/views/GuideView.vue') },
     { path: '/users', component: () => import('@/views/UsersView.vue') },
+    { path: '/toolbox', component: () => import('@/views/ToolboxView.vue') },
   ],
 })
 

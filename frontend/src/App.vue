@@ -45,6 +45,7 @@
         <router-link to="/logs" class="nav-item" :class="{ active: $route.path === '/logs' }">发布日志</router-link>
 
         <p class="nav-section-label mt-2">其他</p>
+        <router-link to="/toolbox" class="nav-item" :class="{ active: $route.path === '/toolbox' }">工具箱</router-link>
         <router-link to="/guide" class="nav-item" :class="{ active: $route.path === '/guide' }">使用说明</router-link>
         <router-link v-if="isAdmin" to="/users" class="nav-item" :class="{ active: $route.path === '/users' }">用户管理</router-link>
       </nav>
@@ -141,6 +142,7 @@ const pageMeta: Record<string, { title: string; desc: string }> = {
   '/logs': { title: '发布日志', desc: '每次发布的详细操作记录' },
   '/guide': { title: '使用说明', desc: '完整操作手册与 FAQ' },
   '/users': { title: '用户管理', desc: '管理系统用户和权限' },
+  '/toolbox': { title: '工具箱', desc: '养号、通知测试等实用工具' },
 }
 
 const pageTitle = computed(() => pageMeta[route.path]?.title || 'Mayrichbe Manager')
