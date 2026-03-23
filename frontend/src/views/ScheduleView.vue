@@ -152,7 +152,7 @@ const failCount = computed(() => filteredTasks.value.filter(t => t.status === 'f
 function getPlatformBadge(accountId: number) {
   return accountMap.value[accountId]?.platform === 'instagram' ? 'badge-pink' : 'badge-red'
 }
-function formatDate(d: string) { return dayjs(d).format('MM-DD HH:mm') }
+function formatDate(d: string) { return dayjs(d).add(9, 'hour').format('MM-DD HH:mm') }
 function isOverdue(task: any) { return task.status === 'pending' && dayjs(task.scheduled_at).isBefore(dayjs()) }
 function statusLabel(s: string) {
   return { pending: '等待', queued: '排队', running: '执行中', success: '成功', failed: '失败', retrying: '重试中', cancelled: '已取消' }[s] || s
