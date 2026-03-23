@@ -124,3 +124,28 @@ def get_warmup_status(request: Request, db: Session = Depends(get_db)):
         "error_count": error_count,
         "failed_messages": failed_accounts[:5],  # 最多返回 5 条失败信息
     }
+
+
+@router.get("/check-proxy")
+def check_proxy(proxy_url: str, request: Request):
+    """测试代理 IP 是否可用，返回出口 IP"""
+    import requests as req_lib
+
+    # 支持 IP:PORT:USER:PASS 格式自动转换
+    s = proxy_url.strip()
+    if s and not s.startswith(("http://", "https://", "socks5://")):
+        parts = s.split(":")
+        if len(parts) == 4:
+            ip, port, user, pw = parts
+            s = f"http://{user}:{pw}@{ip}:{port}"
+
+    try:
+        resp = req_lib.get(
+            "https://api.ipify.org?format=json",
+            proxies={"http": s, "https": s},
+            timeout=12,
+        )
+        ip = resp.json().get("ip", "unknown")
+        return {"success": True, "ip": ip}
+    except Exception as e:
+        return {"success": False, "ip": None, "error": str(e)[:200]}

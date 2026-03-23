@@ -78,6 +78,7 @@ async def upload_material(
     material_type: MaterialType = Form(...),
     folder_tag: Optional[str] = Form(None, description="文件夹标签，如 2026-03-10"),
     target_account_ids: Optional[str] = Form(None, description="账号 ID 列表，逗号分隔"),
+    notes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     """上传素材文件"""
@@ -161,6 +162,7 @@ async def upload_material(
         yt_privacy=yt_privacy,
         folder_tag=folder_tag,
         target_accounts=accounts,
+        notes=notes,
         owner_id=owner_id,
     )
     db.add(material)

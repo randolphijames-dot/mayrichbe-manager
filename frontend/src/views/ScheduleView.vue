@@ -50,7 +50,7 @@
             <td class="text-xs" style="color:var(--text-faint)">{{ task.id }}</td>
             <td>
               <span class="badge" :class="getPlatformBadge(task.account_id)">
-                {{ accountMap[task.account_id]?.username || '#' + task.account_id }}
+                {{ accountMap[task.account_id]?.name || '#' + task.account_id }}
               </span>
             </td>
             <td class="text-xs" style="color:var(--text-muted); max-width:200px" :title="materialDisplayName(task.material_id)">
@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RefreshCw, CalendarDays } from 'lucide-vue-next'
 import { tasksApi, accountsApi, materialsApi } from '@/api'
 import dayjs from 'dayjs'
@@ -152,7 +152,7 @@ const failCount = computed(() => filteredTasks.value.filter(t => t.status === 'f
 function getPlatformBadge(accountId: number) {
   return accountMap.value[accountId]?.platform === 'instagram' ? 'badge-pink' : 'badge-red'
 }
-function formatDate(d: string) { return dayjs(d).add(9, 'hour').format('MM-DD HH:mm') }
+function formatDate(d: string) { return dayjs(d + 'Z').format('MM-DD HH:mm') }
 function isOverdue(task: any) { return task.status === 'pending' && dayjs(task.scheduled_at).isBefore(dayjs()) }
 function statusLabel(s: string) {
   return { pending: '等待', queued: '排队', running: '执行中', success: '成功', failed: '失败', retrying: '重试中', cancelled: '已取消' }[s] || s
@@ -186,4 +186,13 @@ onMounted(async () => {
     materialsApi.list({ limit: 500 }).then(r => { materials.value = r as any[] }),
   ])
 })
+
+let pollTimer: any
+onMounted(() => {
+  pollTimer = setInterval(() => {
+    const hasActive = tasks.value.some(t => ['queued', 'running', 'pending'].includes(t.status))
+    if (hasActive) loadTasks()
+  }, 5000)
+})
+onUnmounted(() => { clearInterval(pollTimer) })
 </script>

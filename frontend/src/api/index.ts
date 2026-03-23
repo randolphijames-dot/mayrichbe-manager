@@ -143,6 +143,7 @@ export const toolsApi = {
   triggerWarmup: (accountIds?: number[]) => api.post('/tools/warmup', { account_ids: accountIds || null }),
   testNotify: (channel: 'line' | 'telegram') => api.post('/tools/notify-test', { channel }),
   getSettings: () => api.get('/tools/settings'),
+  checkProxy: (proxyUrl: string) => api.get('/tools/check-proxy', { params: { proxy_url: proxyUrl } }),
 }
 
 // 发布后统计

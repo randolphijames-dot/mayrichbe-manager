@@ -256,7 +256,7 @@ const upcomingTasks = computed(() =>
     .slice(0, 6)
 )
 
-function formatDate(d: string) { return dayjs(d).add(9, 'hour').format('MM-DD HH:mm') }
+function formatDate(d: string) { return dayjs(d + 'Z').format('MM-DD HH:mm') }
 
 function getPlatformLabel(accountId: number) {
   const a = accountMap.value[accountId]

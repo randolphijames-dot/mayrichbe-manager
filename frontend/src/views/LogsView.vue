@@ -91,8 +91,7 @@ function levelBadge(l: string) {
   return { success: 'badge-green', error: 'badge-red', warning: 'badge-yellow', info: 'badge-blue' }[l] || 'badge-gray'
 }
 function formatDate(d: string) {
-  // 数据库存 UTC，+9 小时转成日本时间（JST）显示
-  return dayjs(d).add(9, 'hour').format('MM-DD HH:mm:ss')
+  return dayjs(d + 'Z').format('MM-DD HH:mm:ss')
 }
 function showDetail(log: any) { detailLog.value = log }
 

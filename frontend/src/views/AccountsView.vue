@@ -289,6 +289,15 @@
               <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">代理 IP（强烈建议填写）</label>
               <input v-model="form.proxy" class="input font-mono text-sm" placeholder="IP:端口:用户名:密码，如 23.26.61.201:5667:user:pass" />
               <p class="text-xs mt-1" style="color:var(--text-faint)">支持 IP:端口:用户名:密码 格式，系统自动转换。每个账号建议使用独立代理（日本住宅 IP）</p>
+              <div class="flex items-center gap-2 mt-2">
+                <button type="button" class="btn btn-secondary btn-sm" :disabled="proxyChecking || !form.proxy" @click="handleCheckProxy">
+                  <span v-if="proxyChecking" class="w-3 h-3 border-2 rounded-full animate-spin" style="border-color:var(--border); border-top-color:#0ea5e9"></span>
+                  {{ proxyChecking ? '检测中...' : '测试代理' }}
+                </button>
+                <span v-if="proxyResult" class="text-xs" :style="proxyResult.success ? 'color:#4ade80' : 'color:#f87171'">
+                  {{ proxyResult.success ? `✓ 出口 IP：${proxyResult.ip}` : `✗ ${proxyResult.error}` }}
+                </span>
+              </div>
             </div>
 
             <!-- 备注 -->
@@ -338,7 +347,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue'
 import { Plus, Upload, RefreshCw, Users, X } from 'lucide-vue-next'
-import { accountsApi, youtubeApi, tasksApi } from '@/api'
+import { accountsApi, youtubeApi, tasksApi, toolsApi } from '@/api'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
@@ -352,6 +361,8 @@ const showModal = ref(false)
 const editRecord = ref<any>(null)
 const checkingId = ref<number | null>(null)
 const deleteTarget = ref<any>(null)
+const proxyChecking = ref(false)
+const proxyResult = ref<{ success: boolean; ip?: string; error?: string } | null>(null)
 const toast = ref<{ message: string; type: string } | null>(null)
 
 const publishMethods = [
@@ -480,6 +491,19 @@ function _normalizeProxy(raw: string): string {
     return `http://${user}:${pass}@${ip}:${port}`
   }
   return s
+}
+
+async function handleCheckProxy() {
+  proxyResult.value = null
+  proxyChecking.value = true
+  try {
+    const res = await toolsApi.checkProxy(form.proxy) as any
+    proxyResult.value = res
+  } catch (e: any) {
+    proxyResult.value = { success: false, error: e?.response?.data?.detail || '请求失败' }
+  } finally {
+    proxyChecking.value = false
+  }
 }
 
 async function handleSubmit() {

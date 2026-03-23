@@ -195,6 +195,7 @@
             </div>
             <!-- 标题 -->
             <p class="text-sm font-medium truncate" style="color:var(--text-primary)">{{ m.title || '素材 #' + m.id }}</p>
+            <p v-if="m.notes" class="text-xs truncate" style="color:var(--text-faint)" :title="m.notes">📝 {{ m.notes }}</p>
 
             <!-- 标签 -->
             <div v-if="m.tags && m.tags.length > 0" class="flex flex-wrap gap-1">
@@ -329,6 +330,12 @@
               <textarea v-model="uploadForm.caption" class="input text-sm" rows="3" placeholder="Instagram 发布时的文案..." />
             </div>
 
+            <!-- 备注 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">备注（仅内部使用）</label>
+              <input v-model="uploadForm.notes" class="input text-sm" placeholder="可选备注，方便管理素材" />
+            </div>
+
             <!-- 分配账号 -->
             <div>
               <label class="text-xs font-medium mb-2 block" style="color:var(--text-muted)">分配给哪些账号（可选）</label>
@@ -342,7 +349,7 @@
                     : 'badge-gray'"
                   @click="toggleUploadAccount(a.id)"
                 >
-                  {{ a.platform === 'instagram' ? '📸' : '▶' }} {{ a.username }}
+                  {{ a.platform === 'instagram' ? '📸' : '▶' }} {{ a.name || a.username }}
                 </button>
                 <span v-if="accounts.length === 0" class="text-xs" style="color:var(--text-faint)">先在账号管理页添加账号</span>
               </div>
@@ -394,6 +401,12 @@
               <input v-model="editTagsInput" class="input text-sm" placeholder="标签1, 标签2, 标签3" />
             </div>
 
+            <!-- 备注 -->
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">备注（仅内部使用）</label>
+              <input v-model="editForm.notes" class="input text-sm" placeholder="可选备注，方便管理素材" />
+            </div>
+
             <!-- 分配账号 -->
             <div>
               <label class="text-xs font-medium mb-2 block" style="color:var(--text-muted)">分配给哪些账号</label>
@@ -407,7 +420,7 @@
                     : 'badge-gray'"
                   @click="toggleEditAccount(a.id)"
                 >
-                  {{ a.platform === 'instagram' ? '📸' : '▶' }} {{ a.username }}
+                  {{ a.platform === 'instagram' ? '📸' : '▶' }} {{ a.name || a.username }}
                 </button>
                 <span v-if="accounts.length === 0" class="text-xs" style="color:var(--text-faint)">先在账号管理页添加账号</span>
               </div>
@@ -527,7 +540,7 @@
                   class="badge cursor-pointer"
                   :class="taskForm.account_ids.includes(a.id) ? (a.platform==='instagram' ? 'badge-pink':'badge-red') : 'badge-gray'"
                   @click="toggleTaskAccount(a.id)">
-                  {{ a.platform==='instagram'?'📸':'▶' }} {{ a.username }}
+                  {{ a.platform==='instagram'?'📸':'▶' }} {{ a.name || a.username }}
                 </button>
               </div>
             </div>
@@ -1135,7 +1148,8 @@ function countByAccount(aid: number) {
   return materials.value.filter(m => m.target_account_ids?.includes(aid)).length
 }
 function accountName(id: number) {
-  return accounts.value.find(a => a.id === id)?.username || `#${id}`
+  const a = accounts.value.find(a => a.id === id)
+  return a?.name || a?.username || `#${id}`
 }
 
 function formatDuration(seconds: number): string {
@@ -1151,6 +1165,7 @@ const editingMaterial = ref<any>(null)
 const editForm = reactive({
   title: '',
   caption: '',
+  notes: '',
   yt_title: '',
   target_account_ids: [] as number[],
 })
@@ -1161,6 +1176,7 @@ function openEditModal(m: any) {
   editForm.title = m.title || ''
   editForm.caption = m.caption || ''
   editForm.yt_title = m.yt_title || ''
+  editForm.notes = m.notes || ''
   editForm.target_account_ids = [...(m.target_account_ids || [])]
   editTagsInput.value = (m.tags || []).join(', ')
   showEditModal.value = true
@@ -1183,6 +1199,7 @@ async function handleEditSave() {
     await materialsApi.update(editingMaterial.value.id, {
       title: editForm.title,
       caption: editForm.caption,
+      notes: editForm.notes,
       yt_title: editForm.yt_title,
       tags,
       target_account_ids: editForm.target_account_ids,
@@ -1242,13 +1259,14 @@ const uploadForm = reactive({
   folder_tag: '',
   title: '',
   caption: '',
+  notes: '',
   target_account_ids: [] as number[],
   yt_privacy: 'public',
 })
 
 function openUpload() {
   uploadFile.value = null
-  Object.assign(uploadForm, { material_type: 'video', folder_tag: todayStr, title: '', caption: '', target_account_ids: [], yt_privacy: 'public' })
+  Object.assign(uploadForm, { material_type: 'video', folder_tag: todayStr, title: '', caption: '', notes: '', target_account_ids: [], yt_privacy: 'public' })
   showUploadModal.value = true
 }
 function toggleUploadAccount(id: number) {
@@ -1266,6 +1284,7 @@ async function handleUpload() {
     fd.append('material_type', uploadForm.material_type)
     if (uploadForm.title) fd.append('title', uploadForm.title)
     if (uploadForm.caption) fd.append('caption', uploadForm.caption)
+    if (uploadForm.notes) fd.append('notes', uploadForm.notes)
     if (uploadForm.folder_tag) fd.append('folder_tag', uploadForm.folder_tag)
     fd.append('yt_privacy', uploadForm.yt_privacy)
     if (uploadForm.target_account_ids.length) fd.append('target_account_ids', uploadForm.target_account_ids.join(','))
