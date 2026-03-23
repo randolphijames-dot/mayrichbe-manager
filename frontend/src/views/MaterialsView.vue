@@ -26,7 +26,7 @@
           style="font-size:12px; padding:6px 10px"
         >
           <span>{{ a.platform === 'instagram' ? '📸' : '▶' }}</span>
-          <span class="truncate flex-1 text-left">{{ a.username }}</span>
+          <span class="truncate flex-1 text-left">{{ a.name || a.username }}</span>
           <span class="badge badge-gray" style="font-size:10px">{{ countByAccount(a.id) }}</span>
         </button>
       </div>
@@ -236,7 +236,7 @@
               <th v-for="a in accounts" :key="a.id" style="min-width:100px; text-align:center">
                 <div class="flex flex-col items-center gap-0.5">
                   <span>{{ a.platform === 'instagram' ? '📸' : '▶' }}</span>
-                  <span style="font-size:10px; color:var(--text-faint)" class="truncate max-w-20">{{ a.username }}</span>
+                  <span style="font-size:10px; color:var(--text-faint)" class="truncate max-w-20">{{ a.name || a.username }}</span>
                 </div>
               </th>
             </tr>
@@ -743,7 +743,7 @@
                 </div>
                 <span class="text-sm">{{ account.platform === 'instagram' ? '📸' : '▶' }}</span>
                 <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium truncate">{{ account.username }}</div>
+                  <div class="text-sm font-medium truncate">{{ account.name || account.username }}</div>
                   <div v-if="account.group_name" class="text-xs opacity-70 truncate">{{ account.group_name }}</div>
                 </div>
               </label>
@@ -905,7 +905,7 @@
           >
             <div class="flex items-center gap-2 mb-2">
               <span class="text-lg">{{ account.platform === 'instagram' ? '📸' : '▶' }}</span>
-              <span class="text-sm font-medium truncate">{{ account.username }}</span>
+              <span class="text-sm font-medium truncate">{{ account.name || account.username }}</span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-xs opacity-70">{{ account.group_name || '未分组' }}</span>
