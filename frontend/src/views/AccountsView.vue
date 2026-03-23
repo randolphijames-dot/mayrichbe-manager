@@ -287,8 +287,8 @@
             <!-- 代理 -->
             <div>
               <label class="text-xs font-medium mb-1 block" style="color:var(--text-muted)">代理 IP（强烈建议填写）</label>
-              <input v-model="form.proxy" class="input font-mono text-sm" placeholder="http://user:pass@ip:port 或 socks5://..." />
-              <p class="text-xs mt-1" style="color:var(--text-faint)">每个账号应使用独立代理，建议住宅 IP（日本节点）</p>
+              <input v-model="form.proxy" class="input font-mono text-sm" placeholder="IP:端口:用户名:密码，如 23.26.61.201:5667:user:pass" />
+              <p class="text-xs mt-1" style="color:var(--text-faint)">支持 IP:端口:用户名:密码 格式，系统自动转换。每个账号建议使用独立代理（日本住宅 IP）</p>
             </div>
 
             <!-- 备注 -->
@@ -468,6 +468,20 @@ function handleEdit(record: any) {
   })
   showModal.value = true
 }
+function _normalizeProxy(raw: string): string {
+  if (!raw) return ''
+  const s = raw.trim()
+  // 已经是标准格式（http:// 或 socks5://）直接返回
+  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('socks5://')) return s
+  // 兼容格式：IP:端口:用户名:密码 → http://用户名:密码@IP:端口
+  const parts = s.split(':')
+  if (parts.length === 4) {
+    const [ip, port, user, pass] = parts
+    return `http://${user}:${pass}@${ip}:${port}`
+  }
+  return s
+}
+
 async function handleSubmit() {
   if (!form.name || !form.username) { showToast('请填写名称和用户名', 'error'); return }
   if (form.platform === 'instagram' && form.publish_method === 'bitbrowser' && !form.browser_profile_id) {
@@ -480,7 +494,7 @@ async function handleSubmit() {
       group_name: form.group_name || null,
       browser_type: form.publish_method === 'instagrapi' ? 'none' : form.publish_method,
       browser_profile_id: form.browser_profile_id || null,
-      proxy: form.proxy || null,
+      proxy: _normalizeProxy(form.proxy) || null,
       notes: form.notes || null,
     }
     if (form.ins_password) payload.ins_password = form.ins_password
